@@ -1,0 +1,3 @@
+# Direct, reviewed inputs for the reproducible Python lock.
+serena-agent==1.5.3
+graphifyy==0.9.12

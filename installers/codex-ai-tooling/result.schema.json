@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://qbit.dev/schemas/codex-ai-tooling-result-1.0.json",
+  "title": "Codex AI Tooling installer result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "installer_version",
+    "operation",
+    "target",
+    "profile",
+    "dry_run",
+    "success",
+    "exit_code",
+    "detected_state",
+    "planned_actions",
+    "performed_actions",
+    "skipped_actions",
+    "conflicts",
+    "warnings",
+    "errors",
+    "rollback",
+    "verification"
+  ],
+  "properties": {
+    "schema_version": { "const": "1.0" },
+    "installer_version": { "type": "string" },
+    "operation": { "type": "string" },
+    "target": { "type": "string" },
+    "profile": { "type": "string" },
+    "dry_run": { "type": "boolean" },
+    "success": { "type": "boolean" },
+    "exit_code": {
+      "enum": [0, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+    },
+    "detected_state": { "type": "string" },
+    "planned_actions": { "$ref": "#/$defs/array" },
+    "performed_actions": { "$ref": "#/$defs/array" },
+    "skipped_actions": { "$ref": "#/$defs/array" },
+    "conflicts": { "$ref": "#/$defs/array" },
+    "warnings": { "$ref": "#/$defs/array" },
+    "errors": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/error" }
+    },
+    "rollback": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["attempted", "success", "actions", "errors"],
+      "properties": {
+        "attempted": { "type": "boolean" },
+        "success": { "type": ["boolean", "null"] },
+        "actions": { "$ref": "#/$defs/array" },
+        "errors": { "$ref": "#/$defs/array" }
+      }
+    },
+    "verification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["performed", "success", "checks"],
+      "properties": {
+        "performed": { "type": "boolean" },
+        "success": { "type": ["boolean", "null"] },
+        "checks": { "$ref": "#/$defs/array" }
+      }
+    }
+  },
+  "$defs": {
+    "array": {
+      "type": "array",
+      "items": {}
+    },
+    "error": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "code",
+        "category",
+        "message",
+        "recoverable",
+        "remediation"
+      ],
+      "properties": {
+        "code": { "type": "string" },
+        "category": { "type": "string" },
+        "message": { "type": "string" },
+        "path": { "type": "string" },
+        "recoverable": { "type": "boolean" },
+        "remediation": { "type": "string" }
+      }
+    }
+  }
+}

@@ -1,0 +1,25 @@
+# Project-scoped MCP configuration. Codex loads this only after the repository is trusted.
+# No user-level Codex configuration is required or changed by this repository.
+
+[mcp_servers.context7]
+url = "https://mcp.context7.com/mcp"
+auth = "oauth"
+enabled = true
+required = false
+startup_timeout_sec = 20
+tool_timeout_sec = 45
+default_tools_approval_mode = "prompt"
+enabled_tools = ["resolve-library-id", "query-docs"]
+
+[mcp_servers.context7.env_http_headers]
+CONTEXT7_API_KEY = "CONTEXT7_API_KEY"
+
+[mcp_servers.serena]
+command = "docker"
+args = ["compose", "--project-directory", ".", "-f", ".ai/tooling/compose.yaml", "run", "--rm", "-T", "serena"]
+enabled = true
+required = false
+startup_timeout_sec = 60
+tool_timeout_sec = 45
+default_tools_approval_mode = "prompt"
+enabled_tools = ["get_symbols_overview", "find_symbol", "find_referencing_symbols", "find_implementations", "find_declaration", "get_diagnostics_for_file", "get_diagnostics_for_symbol", "replace_symbol_body", "insert_after_symbol", "insert_before_symbol", "rename_symbol", "safe_delete_symbol"]

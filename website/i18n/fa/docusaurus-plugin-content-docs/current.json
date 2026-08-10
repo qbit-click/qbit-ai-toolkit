@@ -1,0 +1,14 @@
+{
+  "version.label": {
+    "message": "فعلی",
+    "description": "The label for version current"
+  },
+  "sidebar.docs.category.Architecture & contracts": {
+    "message": "معماری و قراردادها",
+    "description": "The label for category 'Architecture & contracts' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.Repository AI tooling": {
+    "message": "ابزارهای AI خود repository",
+    "description": "The label for category 'Repository AI tooling' in sidebar 'docs'"
+  }
+}

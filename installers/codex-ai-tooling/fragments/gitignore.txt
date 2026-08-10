@@ -1,0 +1,8 @@
+# Repository-owned AI tooling generated state only; configuration and docs are tracked.
+.ai/cache/
+.ai/tooling/language-servers/node_modules/
+graphify-out/
+.graphify/
+.validation-logs/
+test-results/
+.qbit-toolkit-backups/

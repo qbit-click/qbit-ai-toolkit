@@ -1,0 +1,22 @@
+name: codex-single-project
+description: Qbit Toolkit single-project semantic context
+prompt: >-
+  Use only the exposed semantic symbol and diagnostic tools. Codex built-ins
+  own ordinary file, directory, pattern, shell, Git, and memory operations.
+single_project: true
+excluded_tools: []
+included_optional_tools: []
+fixed_tools:
+  - get_symbols_overview
+  - find_symbol
+  - find_referencing_symbols
+  - find_implementations
+  - find_declaration
+  - get_diagnostics_for_file
+  - get_diagnostics_for_symbol
+  - replace_symbol_body
+  - insert_after_symbol
+  - insert_before_symbol
+  - rename_symbol
+  - safe_delete_symbol
+tool_description_overrides: {}

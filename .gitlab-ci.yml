@@ -1,0 +1,43 @@
+stages:
+  - validate
+  - unit
+  - integration
+  - e2e
+
+variables:
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+
+validate:
+  stage: validate
+  image: python:3.13.14-slim-bookworm@sha256:fcbd8dfc2605ba7c2eca646846c5e892b2931e41f6227985154a596f26ab8ed7
+  script:
+    - python tools/validate.py
+    - sh -n tools/validate.sh
+    - sh -n tools/test.sh
+    - sh -n installers/codex-ai-tooling/install.sh
+    - sh -n installers/codex-ai-tooling/verify.sh
+    - sh -n installers/codex-ai-tooling/uninstall.sh
+    - sh -n installers/codex-ai-tooling/tests/unit/test-unit.sh
+    - sh -n installers/codex-ai-tooling/tests/integration/test-installer.sh
+    - sh -n installers/codex-ai-tooling/tests/e2e/test-e2e.sh
+    - git diff --check
+
+unit:
+  stage: unit
+  image: python:3.13.14-slim-bookworm@sha256:fcbd8dfc2605ba7c2eca646846c5e892b2931e41f6227985154a596f26ab8ed7
+  script:
+    - python -m unittest tests.unit.test_validate -v
+    - sh installers/codex-ai-tooling/tests/unit/test-unit.sh
+
+integration:
+  stage: integration
+  image: python:3.13.14-slim-bookworm@sha256:fcbd8dfc2605ba7c2eca646846c5e892b2931e41f6227985154a596f26ab8ed7
+  script:
+    - sh installers/codex-ai-tooling/tests/integration/test-installer.sh
+
+e2e:
+  stage: e2e
+  image: python:3.13.14-slim-bookworm@sha256:fcbd8dfc2605ba7c2eca646846c5e892b2931e41f6227985154a596f26ab8ed7
+  script:
+    - sh installers/codex-ai-tooling/tests/e2e/test-e2e.sh
+    - sh tools/test.sh --layer docker

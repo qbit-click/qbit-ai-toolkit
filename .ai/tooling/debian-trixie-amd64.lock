@@ -1,0 +1,8 @@
+# snapshot=20260720T000000Z architecture=amd64
+main libcom-err2 1.47.2-3+b11 pool/main/e/e2fsprogs/libcom-err2_1.47.2-3+b11_amd64.deb e1feff126b3e8b3a7b18087e88681469b70d8f6d1b7c4e4b89d98577e1a2fdd7
+security libgssapi-krb5-2 1.21.3-5+deb13u1 pool/updates/main/k/krb5/libgssapi-krb5-2_1.21.3-5+deb13u1_amd64.deb 30847c1fde4240567d7ed3aeab4f655dd591203758b857e85e824045aae70299
+main libicu76 76.1-4 pool/main/i/icu/libicu76_76.1-4_amd64.deb c1bf762996de9ecba9b9d871e4928a8090f023a3e9e7fa3240b3d90f892a01dc
+security libk5crypto3 1.21.3-5+deb13u1 pool/updates/main/k/krb5/libk5crypto3_1.21.3-5+deb13u1_amd64.deb 7da07ee674b47f1f0be7cc89317c25310086a1f1761217d0f72e6ae2c5a69b84
+main libkeyutils1 1.6.3-6 pool/main/k/keyutils/libkeyutils1_1.6.3-6_amd64.deb 0b11ad17be0300b63ad4eeb4c6450fed24d34b7b740f23e5363dcb29ee6d5eba
+security libkrb5-3 1.21.3-5+deb13u1 pool/updates/main/k/krb5/libkrb5-3_1.21.3-5+deb13u1_amd64.deb 47d71d6a7f2e59b9bae5f89602397594805113b95889ad18fa703cd53abafc97
+security libkrb5support0 1.21.3-5+deb13u1 pool/updates/main/k/krb5/libkrb5support0_1.21.3-5+deb13u1_amd64.deb 3a0acd8b37955c0e102c756b52c97df2a31f67b96453c35dab70df218d309117

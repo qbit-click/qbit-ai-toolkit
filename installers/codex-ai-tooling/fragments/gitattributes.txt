@@ -1,0 +1,10 @@
+AGENTS.md text eol=lf
+.env.ai.example text eol=lf
+.graphifyignore text eol=lf
+.agents/** text eol=lf
+.ai/** text eol=lf
+.codex/** text eol=lf
+.serena/** text eol=lf
+.qbit-toolkit/** text eol=lf
+.qbit/toolkit/** text eol=lf
+docs/ai-tooling/** text eol=lf

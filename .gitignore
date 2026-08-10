@@ -1,0 +1,57 @@
+# IDE
+.idea/
+*.iml
+.vscode/changelists.json
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*~
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Test and build outputs
+/test-output/
+/test-results/
+/dist/
+/release/
+/releases/
+/tmp/
+/temp/
+/.tmp/
+/installers/*/tests/tmp-fixtures/
+
+# Documentation site
+/website/node_modules/
+/website/build/
+/website/.docusaurus/
+
+# Qbit Toolkit local state
+/.qbit-toolkit-backups/
+/.qbit-toolkit-cache/
+
+# Generated browser tooling state
+/.playwright-cli/
+/.playwright/artifacts/
+/playwright-report/
+/screenshots/
+/traces/
+/videos/
+
+# BEGIN project-owned AI generated artifacts
+/.ai/cache/
+/.ai/tooling/language-servers/node_modules/
+/.validation-logs/
+/graphify-out/
+/.graphify/
+/.serena/*
+!/.serena/project.yml
+!/.serena/codex-single-project.yml
+!/.serena/.gitignore
+# END project-owned AI generated artifacts

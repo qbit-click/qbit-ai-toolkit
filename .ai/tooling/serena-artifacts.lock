@@ -1,0 +1,5 @@
+# name version url sha256
+powershell 7.6.4 https://github.com/PowerShell/PowerShell/releases/download/v7.6.4/powershell-7.6.4-linux-x64.tar.gz 4471b5a36bfe86ec7af8525d36bb1cacba0128e7aac22d05cc064bc00e604721
+powershell-editor-services 4.4.0 https://github.com/PowerShell/PowerShellEditorServices/releases/download/v4.4.0/PowerShellEditorServices.zip 690b91092989a0f66e6f43986166aaef69d64b559a9fda51feed882e1103fbcc
+psscriptanalyzer 1.25.0 https://www.powershellgallery.com/api/v2/package/PSScriptAnalyzer/1.25.0 14e634c828eb98efb9f40b2918ba90f139ed5eccdf663a2a747736d996995d60
+shellcheck 0.10.0 https://github.com/koalaman/shellcheck/releases/download/v0.10.0/shellcheck-v0.10.0.linux.x86_64.tar.xz 6c881ab0698e4e6ea235245f22832860544f17ba386442fe7e9d629f8cbedf87

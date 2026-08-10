@@ -1,0 +1,153 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://qbit.dev/schemas/installer-manifest.schema.json",
+  "title": "Qbit Toolkit Installer Manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "id",
+    "name",
+    "kind",
+    "version",
+    "status",
+    "consumers",
+    "supportedPlatforms",
+    "supportedProfiles",
+    "defaultProfile",
+    "entrypoints",
+    "verifiers",
+    "uninstallers",
+    "description"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "id": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "kind": {
+      "type": "string",
+      "const": "installer"
+    },
+    "version": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "experimental",
+        "preview",
+        "stable",
+        "deprecated"
+      ]
+    },
+    "consumers": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "cli",
+          "console",
+          "shared"
+        ]
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "supportedPlatforms": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "windows",
+          "linux",
+          "macos"
+        ]
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "supportedProfiles": {
+      "type": "array",
+      "items": {
+        "type": "string",
+          "enum": [
+            "generic",
+            "typescript",
+            "rust"
+          ]
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "defaultProfile": {
+      "type": "string",
+        "enum": [
+          "auto",
+          "generic",
+          "typescript",
+          "rust"
+        ]
+    },
+    "entrypoints": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "powershell",
+        "posix"
+      ],
+      "properties": {
+        "powershell": {
+          "type": "string"
+        },
+        "posix": {
+          "type": "string"
+        }
+      }
+    },
+    "verifiers": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "powershell",
+        "posix"
+      ],
+      "properties": {
+        "powershell": {
+          "type": "string"
+        },
+        "posix": {
+          "type": "string"
+        }
+      }
+    },
+    "uninstallers": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "powershell",
+        "posix"
+      ],
+      "properties": {
+        "powershell": {
+          "type": "string"
+        },
+        "posix": {
+          "type": "string"
+        }
+      }
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1
+    },
+    "futureConsumerIntegration": {
+      "type": "string"
+    }
+  }
+}

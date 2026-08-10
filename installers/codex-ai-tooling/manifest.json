@@ -1,0 +1,36 @@
+{
+  "$schema": "../../schemas/installer-manifest.schema.json",
+  "id": "installer.codex-ai-tooling",
+  "name": "Codex AI Tooling",
+  "version": "1.0.0",
+  "kind": "installer",
+  "status": "stable",
+  "consumers": [
+    "cli"
+  ],
+  "supportedPlatforms": [
+    "windows",
+    "linux",
+    "macos"
+  ],
+  "supportedProfiles": [
+    "generic",
+    "typescript",
+    "rust"
+  ],
+  "defaultProfile": "auto",
+  "entrypoints": {
+    "powershell": "install.ps1",
+    "posix": "install.sh"
+  },
+  "verifiers": {
+    "powershell": "verify.ps1",
+    "posix": "verify.sh"
+  },
+  "uninstallers": {
+    "powershell": "uninstall.ps1",
+    "posix": "uninstall.sh"
+  },
+  "description": "Installs repository-owned Codex AI tooling into a target Git work tree without modifying application dependencies or global configuration.",
+  "futureConsumerIntegration": "A future standalone Toolkit CLI may invoke the published host entrypoint as a child process, pass the normalized lifecycle arguments, consume the final JSON object, and preserve its exit code. The installer has no dependency on that future CLI."
+}

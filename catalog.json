@@ -1,0 +1,33 @@
+{
+  "$schema": "./schemas/catalog.schema.json",
+  "schemaVersion": "1.0",
+  "name": "qbit-ai-toolkit",
+  "assets": [
+    {
+      "id": "installer.codex-ai-tooling",
+      "kind": "installer",
+      "version": "1.0.0",
+      "path": "installers/codex-ai-tooling",
+      "consumers": [
+        "cli"
+      ],
+      "status": "stable",
+      "description": "Installs repository-owned Codex AI tooling assets into a target Git work tree.",
+      "minimumConsumerVersions": {},
+      "supportedPlatforms": [
+        "windows",
+        "linux",
+        "macos"
+      ],
+      "entrypoints": {
+        "powershell": "install.ps1",
+        "posix": "install.sh",
+        "verifyPowerShell": "verify.ps1",
+        "verifyPosix": "verify.sh",
+        "uninstallPowerShell": "uninstall.ps1",
+        "uninstallPosix": "uninstall.sh"
+      },
+      "integrity": {}
+    }
+  ]
+}

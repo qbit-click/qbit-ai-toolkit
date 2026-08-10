@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://qbit.dev/schemas/catalog.schema.json",
+  "title": "Qbit Toolkit Catalog",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schemaVersion",
+    "name",
+    "assets"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "schemaVersion": {
+      "type": "string",
+      "pattern": "^1\\.0$"
+    },
+    "name": {
+      "type": "string",
+      "const": "qbit-ai-toolkit"
+    },
+    "assets": {
+      "type": "array",
+      "items": {
+        "$ref": "./asset.schema.json"
+      },
+      "uniqueItems": true
+    }
+  }
+}

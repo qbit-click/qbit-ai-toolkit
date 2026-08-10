@@ -1,0 +1,28 @@
+language_backend: LSP
+line_ending: native
+gui_log_window: false
+web_dashboard: false
+web_dashboard_open_on_launch: false
+web_dashboard_interface: null
+web_dashboard_listen_address: 127.0.0.1
+jetbrains_plugin_server_address: 127.0.0.1
+log_level: 20
+trace_lsp_communication: false
+ls_specific_settings: {}
+ignored_paths: []
+read_only_memory_patterns: []
+ignored_memory_patterns: []
+tool_timeout: 240
+excluded_tools: []
+included_optional_tools: []
+fixed_tools: []
+base_modes:
+  - interactive
+  - editing
+default_modes: null
+default_max_tool_answer_chars: 150000
+token_count_estimator: CHAR_COUNT
+symbol_info_budget: 10
+project_serena_folder_location: "/serena-state/projects/{{SERENA_PROJECT_NAME}}"
+projects:
+  - "/workspace"

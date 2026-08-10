@@ -1,0 +1,22 @@
+{
+  "title": {
+    "message": "Qbit AI Toolkit",
+    "description": "The title in the navbar"
+  },
+  "item.label.Docs": {
+    "message": "مستندات",
+    "description": "Navbar item with label Docs"
+  },
+  "item.label.Codex AI Tooling": {
+    "message": "ابزارهای Codex AI",
+    "description": "Navbar item with label Codex AI Tooling"
+  },
+  "item.label.Architecture": {
+    "message": "معماری",
+    "description": "Navbar item with label Architecture"
+  },
+  "item.label.GitHub": {
+    "message": "GitHub",
+    "description": "Navbar item with label GitHub"
+  }
+}

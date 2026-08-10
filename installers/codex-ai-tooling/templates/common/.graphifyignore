@@ -1,0 +1,45 @@
+# VCS and dependency caches
+.git/
+node_modules/
+vendor/
+.cache/
+
+# Build and test output
+dist/
+build/
+out/
+coverage/
+.nyc_output/
+*.tsbuildinfo
+
+# Runtime state, generated analysis, and browser evidence
+graphify-out/
+.graphify/
+.serena/cache/
+.ai/cache/
+.playwright-cli/
+.playwright/artifacts/
+playwright-report/
+test-results/
+screenshots/
+traces/
+videos/
+tmp/
+temp/
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.ai.example
+
+# Large binary/source-template assets
+*.pdf
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.webp
+*.zip
+
+# Editor backups are not authoritative source
+*~

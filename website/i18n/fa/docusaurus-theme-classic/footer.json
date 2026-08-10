@@ -1,0 +1,50 @@
+{
+  "link.title.Documentation": {
+    "message": "مستندات",
+    "description": "The title of the footer links column with title=Documentation in the footer"
+  },
+  "link.title.Engineering": {
+    "message": "مهندسی",
+    "description": "The title of the footer links column with title=Engineering in the footer"
+  },
+  "link.title.Project": {
+    "message": "پروژه",
+    "description": "The title of the footer links column with title=Project in the footer"
+  },
+  "link.item.label.Getting started": {
+    "message": "شروع کار",
+    "description": "The label of footer link with label=Getting started linking to /getting-started"
+  },
+  "link.item.label.Codex AI Tooling": {
+    "message": "ابزارهای Codex AI",
+    "description": "The label of footer link with label=Codex AI Tooling linking to /codex-ai-tooling"
+  },
+  "link.item.label.Security": {
+    "message": "امنیت",
+    "description": "The label of footer link with label=Security linking to /security"
+  },
+  "link.item.label.Architecture": {
+    "message": "معماری",
+    "description": "The label of footer link with label=Architecture linking to /architecture"
+  },
+  "link.item.label.Asset contract": {
+    "message": "قرارداد دارایی‌ها",
+    "description": "The label of footer link with label=Asset contract linking to /asset-contract"
+  },
+  "link.item.label.Versioning": {
+    "message": "نسخه‌بندی",
+    "description": "The label of footer link with label=Versioning linking to /versioning"
+  },
+  "link.item.label.GitHub": {
+    "message": "GitHub",
+    "description": "The label of footer link with label=GitHub linking to https://github.com/qbit-click/qbit-ai-toolkit"
+  },
+  "link.item.label.Qbit": {
+    "message": "Qbit",
+    "description": "The label of footer link with label=Qbit linking to https://qbit.click"
+  },
+  "copyright": {
+    "message": "© 2026 Qbit. همه حقوق محفوظ است.",
+    "description": "The footer copyright"
+  }
+}
