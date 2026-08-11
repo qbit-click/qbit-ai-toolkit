@@ -8,7 +8,7 @@ trap cleanup EXIT HUP INT TERM
 pass=0
 fail=0
 skip=0
-scenario(){ scenario_name=$1; shift; if "$@"; then pass=$((pass+1)); echo "PASS $scenario_name"; else fail=$((fail+1)); echo "FAIL $scenario_name" >&2; fi; }
+scenario(){ scenario_name=$1; shift; case "$scenario_name" in *"${QBIT_TOOLKIT_TEST_FILTER:-}"*) ;; *) [ -z "${QBIT_TOOLKIT_TEST_FILTER:-}" ] || return 0 ;; esac; if "$@"; then pass=$((pass+1)); echo "PASS $scenario_name"; else fail=$((fail+1)); echo "FAIL $scenario_name" >&2; fi; }
 new_repo(){ mkdir -p "$tmp/$1"; git -C "$tmp/$1" init -q; printf '%s' "$tmp/$1"; }
 snapshot_files(){ find "$1" -path "$1/.git" -prune -o -type f -exec sh -c 'for f do printf "%s:" "$f"; if command -v sha256sum >/dev/null 2>&1; then sha256sum "$f" | cut -d " " -f 1; else shasum -a 256 "$f" | cut -d " " -f 1; fi; done' sh {} + | sort; }
 write_project_agents(){ cat > "$1/AGENTS.md" <<'EOF'
@@ -32,7 +32,18 @@ Trailing spaces stay here.
 EOF
 }
 typescript_lifecycle(){ repo=$(new_repo ts-life); echo '{}' > "$repo/tsconfig.json"; echo keep > "$repo/UNRELATED.txt"; bash "$installer_root/install.sh" --target "$repo" --profile auto --skip-bootstrap --skip-doctor >/dev/null; grep -q '"profile": "typescript"' "$repo/.qbit/toolkit/installed/codex-ai-tooling.json"; bash "$installer_root/verify.sh" --target "$repo" >/dev/null; before=$(snapshot_files "$repo"); bash "$installer_root/install.sh" --target "$repo" --profile auto --skip-bootstrap --skip-doctor >/dev/null; after=$(snapshot_files "$repo"); [ "$before" = "$after" ]; bash "$installer_root/uninstall.sh" --target "$repo" >/dev/null; [ -f "$repo/UNRELATED.txt" ] && [ ! -f "$repo/.qbit/toolkit/installed/codex-ai-tooling.json" ]; }
-generic_lifecycle(){ repo=$(new_repo generic-life); echo keep > "$repo/UNRELATED.txt"; bash "$installer_root/install.sh" --target "$repo" --profile auto --skip-bootstrap --skip-doctor >/dev/null; grep -q '"profile": "generic"' "$repo/.qbit/toolkit/installed/codex-ai-tooling.json"; bash "$installer_root/verify.sh" --target "$repo" >/dev/null; grep -q 'enabled = false' "$repo/.codex/config.toml"; bash "$installer_root/uninstall.sh" --target "$repo" >/dev/null; [ -f "$repo/UNRELATED.txt" ]; }
+generic_lifecycle(){
+  repo=$(new_repo generic-life)
+  echo keep > "$repo/UNRELATED.txt"
+  bash "$installer_root/install.sh" --target "$repo" --profile auto --skip-bootstrap --skip-doctor >/dev/null
+  grep -q '"profile": "generic"' "$repo/.qbit/toolkit/installed/codex-ai-tooling.json"
+  bash "$installer_root/verify.sh" --target "$repo" >/dev/null
+  grep -Fq '[mcp_servers.serena]' "$repo/.codex/config.toml"
+  grep -q 'enabled = true' "$repo/.codex/config.toml"
+  for language in powershell bash python; do grep -Fq "  - $language" "$repo/.serena/project.yml"; done
+  bash "$installer_root/uninstall.sh" --target "$repo" >/dev/null
+  [ -f "$repo/UNRELATED.txt" ]
+}
 rust_lifecycle(){
   repo=$(new_repo rust-life)
   cat > "$repo/Cargo.toml" <<'EOF'

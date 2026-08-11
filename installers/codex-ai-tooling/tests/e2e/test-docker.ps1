@@ -41,6 +41,7 @@ function Remove-DockerArtifacts([object]$State) {
     ForEach-Object { docker volume rm $_ 2>$null | Out-Null }
 }
 function Scenario([string]$Name, [scriptblock]$Body) {
+  if ($env:QBIT_TOOLKIT_TEST_FILTER -and $Name.IndexOf($env:QBIT_TOOLKIT_TEST_FILTER, [StringComparison]::OrdinalIgnoreCase) -lt 0) { return }
   $Script:ScenarioState = $null
   try {
     & $Body
@@ -87,7 +88,8 @@ try {
     & docker image inspect $State.dockerImageName | Out-Null
     if ($LASTEXITCODE -ne 0) { throw 'Expected TypeScript Docker image was not built.' }
     Invoke-ComposeRun $Repo @('python', '-c', 'import importlib.metadata as m; assert m.version("serena-agent") == "1.5.3"; assert m.version("graphifyy") == "0.9.12"')
-    Invoke-ComposeRun $Repo @('node', '--version')
+    Invoke-ComposeRun $Repo @('node', '-e', 'const ts=require("/opt/serena-language-servers/node_modules/typescript/package.json"); const tls=require("/opt/serena-language-servers/node_modules/typescript-language-server/package.json"); if(ts.version!=="5.9.3"||tls.version!=="5.1.3") process.exit(1)')
+    Invoke-ComposeRun $Repo @('python', '-c', 'import os,pwd,grp; assert os.getuid()==10001 and os.getgid()==10001; assert pwd.getpwuid(10001).pw_name=="ai-tooling"; assert grp.getgrgid(10001).gr_name=="ai-tooling"')
   }
 
   Scenario 'Docker Rust bootstrap and doctor' {

@@ -32,6 +32,8 @@ for relative in "${required[@]}"; do [[ -f "$root/$relative" ]] || { echo "Missi
 grep -Fq '"lockfileVersion": 3' "$root/.ai/tooling/language-servers/package-lock.json"
 grep -Fq '"bash-language-server": "5.6.0"' "$root/.ai/tooling/language-servers/package-lock.json"
 grep -Fq '"pyright": "1.1.403"' "$root/.ai/tooling/language-servers/package-lock.json"
+grep -Fq '"typescript": "5.9.3"' "$root/.ai/tooling/language-servers/package-lock.json"
+grep -Fq '"typescript-language-server": "5.1.3"' "$root/.ai/tooling/language-servers/package-lock.json"
 [[ ! -e "$root/node_modules" && ! -e "$root/.ai/tooling/language-servers/node_modules" ]] || { echo 'Repository node_modules is forbidden.' >&2; exit 1; }
 docker compose --project-directory "$root" -f "$compose" config --quiet
 
@@ -39,6 +41,7 @@ before_index="$(index_snapshot)"
 build_args=(compose --project-directory "$root" -f "$compose" build)
 if [[ "${1:-}" == "--clean" ]]; then build_args+=(--pull --no-cache); elif [[ $# -ne 0 ]]; then echo 'usage: bootstrap.sh [--clean]' >&2; exit 2; fi
 docker "${build_args[@]}"
+docker compose --project-directory "$root" -f "$compose" run --rm -T --no-deps serena true
 after_index="$(index_snapshot)"
-[[ "$after_index" == "$before_index" ]] || { echo 'Git index changed during the AI tooling build.' >&2; exit 1; }
-echo 'AI tooling image build completed without starting services or mutating the Git index.'
+[[ "$after_index" == "$before_index" ]] || { echo 'Git index changed during the AI tooling bootstrap.' >&2; exit 1; }
+echo 'AI tooling image and Serena state/resources prepared without starting MCP services or mutating the Git index.'

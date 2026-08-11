@@ -1156,11 +1156,15 @@ Scenario 'No unresolved placeholders remain' {
   $Matches = Get-ChildItem -LiteralPath $Repo -Recurse -File -Force | Where-Object { $_.FullName -notmatch '\\.git\\' } | Select-String -Pattern '\{\{[A-Z0-9_]+\}\}'
   Assert (-not $Matches) 'Unresolved placeholder found in installed output.'
 }
-Scenario 'Sentry is absent from installed configuration' {
-  $Repo = New-Repo 'no-sentry'
+Scenario 'Sentry is optional and read-only in installed configuration' {
+  $Repo = New-Repo 'read-only-sentry'
   RunInstall $Repo -InstallProfile 'generic'
   $Config = ReadText (Join-Path $Repo '.codex/config.toml')
-  Assert (-not ($Config -match 'sentry|find_organizations|search_issues|update_issue|execute_sentry_tool|analyze_issue_with_seer')) 'Sentry configuration or tools are present.'
+  Assert ($Config.Contains('[mcp_servers.sentry]')) 'Optional Sentry MCP server is missing.'
+  foreach($Tool in @('find_organizations','find_projects','get_sentry_resource','search_events','search_issues')){
+    Assert ($Config.Contains('"' + $Tool + '"')) "Sentry read-only tool is missing: $Tool"
+  }
+  Assert (-not ($Config -match 'update_issue|execute_sentry_tool|analyze_issue_with_seer|resolve_issue')) 'Mutating or broad Sentry tool is configured.'
 }
 Scenario 'Graphify and Playwright are not MCP servers' {
   $Repo = New-Repo 'no-graphify-playwright-mcp'

@@ -5,10 +5,13 @@
     {
       "source_path": ".ai/policies",
       "payload_path": "templates/common/.ai/policies",
-      "copy_mode": "byte-identical",
+      "copy_mode": "normalized-text",
       "parameterized_fields": [],
-      "normalization_rules": [],
-      "drift_policy": "fail"
+      "normalization_rules": [
+        "consumer routing includes scoped Graphify and optional read-only Sentry",
+        "consumer profile language wording is generalized"
+      ],
+      "drift_policy": "review-normalized-differences"
     },
     {
       "source_path": ".ai/scripts",
@@ -41,10 +44,13 @@
     {
       "source_path": ".codex/config.toml",
       "payload_path": "templates/common/.codex/config.toml",
-      "copy_mode": "byte-identical",
+      "copy_mode": "normalized-text",
       "parameterized_fields": [],
-      "normalization_rules": [],
-      "drift_policy": "fail"
+      "normalization_rules": [
+        "consumer Serena startup is lazy and may build the pinned image",
+        "consumer config includes optional read-only Sentry routing"
+      ],
+      "drift_policy": "review-normalized-differences"
     },
     {
       "source_path": ".serena/project.yml",

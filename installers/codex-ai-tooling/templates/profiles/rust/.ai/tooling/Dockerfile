@@ -1,6 +1,8 @@
 # syntax=docker/dockerfile:1.7@sha256:a57df69d0ea827fb7266491f2813635de6f17269be881f696fbfdf2d83dda33e
 ARG NODE_IMAGE=node:24.18.0-trixie-slim@sha256:5301bbf5e8046148348b1dea15436326f43c579031f8d76654a631225bdfe467
 ARG PYTHON_IMAGE=python:3.13.14-slim-trixie@sha256:afe189875f1d2f9b45e287834fb9f2c273a5d59d354ae4050ab9affbf0a6ba06
+ARG RUST_BASE_IMAGE={{RUST_BASE_IMAGE}}
+ARG RUST_TOOLCHAIN_VERSION={{RUST_TOOLCHAIN_VERSION}}
 
 FROM --platform=linux/amd64 ${NODE_IMAGE} AS language-servers
 WORKDIR /opt/serena-language-servers
@@ -12,10 +14,23 @@ RUN npm ci --ignore-scripts --omit=dev --no-audit --no-fund \
  && test "$(node -p "require('./node_modules/typescript-language-server/package.json').version")" = "5.1.3" \
  && npm cache clean --force
 
+FROM --platform=linux/amd64 ${RUST_BASE_IMAGE} AS rust-toolchain
+ARG RUST_TOOLCHAIN_VERSION
+RUN test "$(rustc --version | awk '{print $2}')" = "${RUST_TOOLCHAIN_VERSION}" \
+ && rustup component add rust-analyzer --toolchain "${RUST_TOOLCHAIN_VERSION}" \
+ && rustup run "${RUST_TOOLCHAIN_VERSION}" rust-analyzer --version
+
 FROM --platform=linux/amd64 ${PYTHON_IMAGE}
 ARG TARGETPLATFORM
+ARG RUST_TOOLCHAIN_VERSION={{RUST_TOOLCHAIN_VERSION}}
 RUN printf 'ai-tooling:x:10001:\n' >> /etc/group \
  && printf 'ai-tooling:x:10001:10001:AI tooling:/tmp:/usr/sbin/nologin\n' >> /etc/passwd
+COPY --from=rust-toolchain /usr/local/cargo /usr/local/cargo
+COPY --from=rust-toolchain /usr/local/rustup /usr/local/rustup
+ENV CARGO_HOME=/usr/local/cargo RUSTUP_HOME=/usr/local/rustup \
+    PATH=/usr/local/cargo/bin:${PATH}
+RUN test "$(rustc --version | awk '{print $2}')" = "${RUST_TOOLCHAIN_VERSION}" \
+ && rust-analyzer --version
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1 PIP_NO_CACHE_DIR=1 PYTHONDONTWRITEBYTECODE=1 \
     GRAPHIFY_OUT=/graphify-output GRAPHIFY_NO_BACKUP=1 GRAPHIFY_QUERY_LOG_DISABLE=1
 RUN test "${TARGETPLATFORM}" = "linux/amd64"
@@ -94,6 +109,8 @@ pwsh.mkdir(parents=True, mode=0o755)
 runtime.extract_tar_safely(artifacts["powershell"].read_bytes(), pwsh, "r:gz")
 
 static = Path("/opt/qbit/serena-resources/language_servers/static")
+rust_analyzer_resources = static / "RustAnalyzer"
+rust_analyzer_resources.mkdir(parents=True, mode=0o755)
 pyright = static / "PyrightServer"
 pyright.mkdir(parents=True, mode=0o755)
 ps_root = static / "PowerShellLanguageServer/powershell"
@@ -128,6 +145,8 @@ required = [
 duplicated = ps_root / "PowerShellEditorServices/PowerShellEditorServices"
 if duplicated.exists():
     raise SystemExit(f"duplicated PSES extraction layout: {duplicated}")
+if not rust_analyzer_resources.is_dir() or rust_analyzer_resources.is_symlink():
+    raise SystemExit(f"required RustAnalyzer resource directory missing or unsafe: {rust_analyzer_resources}")
 if not pyright.is_dir() or pyright.is_symlink():
     raise SystemExit(f"required Pyright resource directory missing or unsafe: {pyright}")
 for path in required:

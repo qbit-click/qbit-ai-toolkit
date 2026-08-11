@@ -9,6 +9,8 @@ import json
 import os
 from pathlib import Path
 import platform
+import pwd
+import grp
 import stat
 import subprocess
 import sys
@@ -17,10 +19,10 @@ from typing import Any
 CHECK_IDS = (
     "identity", "capabilities", "platform", "network", "workspace-read-only",
     "state-read-only", "resources-read-only", "graphify-output-read-only", "rootfs-read-only",
-    "protected-symlink", "global-config", "project-config", "global-no-migration",
+    "protected-symlink", "global-config", "project-config", "serena-config-load", "global-no-migration",
     "project-no-migration", "workspace-pre-registered", "external-state-resolution",
     "no-workspace-serena-fallback", "resource-manifest", "resource-entries", "versions",
-    "runtime-paths", "ldd-closure", "provider-offline", "mcp-initialize", "mcp-allowlist",
+    "runtime-paths", "typescript-runtime", "rust-runtime", "ldd-closure", "provider-offline", "ephemeral-serena-home", "mcp-initialize", "mcp-allowlist",
     "mcp-construction", "mcp-process-start", "mcp-initialize-send",
     "mcp-initialize-receive", "mcp-initialize-validate",
     "powershell-semantic-smoke", "bash-semantic-smoke", "python-semantic-smoke",
@@ -50,7 +52,9 @@ PROJECT_KEYS = {
     "read_only_memory_patterns", "ignored_memory_patterns",
 }
 PERSISTENT_ROOTS = (Path("/workspace"), Path("/serena-state"), Path("/serena-resources"), Path("/graphify-output"))
-SKIP_MOUNTS = {"/serena-state/logs", "/serena-state/projects/{{SERENA_PROJECT_NAME}}/cache", "/graphify-output"}
+SKIP_MOUNTS = {"/graphify-output"}
+EPHEMERAL_SERENA_HOME = Path("/tmp/qbit-doctor-serena")
+EPHEMERAL_PROJECT_STATE = EPHEMERAL_SERENA_HOME / "projects" / "{{SERENA_PROJECT_NAME}}"
 
 
 def load_runtime() -> Any:
@@ -134,12 +138,54 @@ def ldd_output(path: str) -> str:
     raise subprocess.CalledProcessError(result.returncode, result.args, result.stdout, result.stderr)
 
 
+def prepare_ephemeral_serena_home(global_value: dict[str, Any], project_value: dict[str, Any]) -> None:
+    import yaml
+
+    EPHEMERAL_PROJECT_STATE.mkdir(parents=True, mode=0o700, exist_ok=False)
+    for relative in ("logs", "memories", "home", "xdg-cache", "prompt_templates"):
+        path = EPHEMERAL_SERENA_HOME / relative
+        path.mkdir(mode=0o700)
+    (EPHEMERAL_PROJECT_STATE / "cache").mkdir(mode=0o700)
+    language_servers = EPHEMERAL_SERENA_HOME / "language_servers"
+    language_servers.symlink_to("/serena-resources/current/language_servers", target_is_directory=True)
+
+    runtime_global = dict(global_value)
+    runtime_global["project_serena_folder_location"] = str(EPHEMERAL_PROJECT_STATE)
+    (EPHEMERAL_SERENA_HOME / "serena_config.yml").write_text(
+        yaml.safe_dump(runtime_global, sort_keys=False, allow_unicode=True),
+        encoding="utf-8",
+    )
+    (EPHEMERAL_PROJECT_STATE / "project.yml").write_text(
+        yaml.safe_dump(project_value, sort_keys=False, allow_unicode=True),
+        encoding="utf-8",
+    )
+
+
+def load_ephemeral_serena_config() -> tuple[Any, Any]:
+    previous = os.environ.get("SERENA_HOME")
+    os.environ["SERENA_HOME"] = str(EPHEMERAL_SERENA_HOME)
+    try:
+        from serena.config.serena_config import ProjectConfig, SerenaConfig
+        return ProjectConfig, SerenaConfig.from_config_file(generate_if_missing=False)
+    finally:
+        if previous is None:
+            os.environ.pop("SERENA_HOME", None)
+        else:
+            os.environ["SERENA_HOME"] = previous
+
+
 class MCPClient(MCP_STDIO.MCPClient):
     def __init__(self) -> None:
         super().__init__(
             ["serena", "start-mcp-server", "--transport", "stdio", "--project", "/workspace",
-             "--context", "/workspace/.serena/codex-single-project.yml", "--tool-timeout", "45"],
-            cwd="/workspace", env={**os.environ, "SERENA_HOME": "/serena-state"},
+             "--context", "/workspace/.serena/codex-single-project.yml", "--tool-timeout", "300"],
+            cwd="/workspace",
+            env={
+                **os.environ,
+                "SERENA_HOME": str(EPHEMERAL_SERENA_HOME),
+                "HOME": str(EPHEMERAL_SERENA_HOME / "home"),
+                "XDG_CACHE_HOME": str(EPHEMERAL_SERENA_HOME / "xdg-cache"),
+            },
         )
 
 
@@ -170,7 +216,12 @@ def main() -> int:
             raise
 
     try:
-        check("identity", lambda: require(os.geteuid() != 0 and os.getegid() != 0, "Doctor must be non-root"))
+        check("identity", lambda: require(
+            os.geteuid() == 10001 and os.getegid() == 10001
+            and pwd.getpwuid(os.geteuid()).pw_name == "ai-tooling"
+            and grp.getgrgid(os.getegid()).gr_name == "ai-tooling",
+            "Doctor must run as mapped ai-tooling UID/GID 10001",
+        ))
         status = RUNTIME.capability_status()
         check("capabilities", lambda: require(all(status.get(name) == 0 for name in ("CapInh", "CapPrm", "CapEff", "CapBnd", "CapAmb")) and status.get("NoNewPrivs") == 1, f"unsafe process status: {status}"))
         check("platform", lambda: require(sys.platform == "linux" and platform.machine() in {"x86_64", "amd64"}, platform.platform()))
@@ -197,17 +248,27 @@ def main() -> int:
         check("project-config", lambda: require(set(project_value) == PROJECT_KEYS and project_path.read_bytes() == project_source.read_bytes()
               and project_path.stat().st_uid == 0 and stat.S_IMODE(project_path.stat().st_mode) == 0o444, "project config contract mismatch"))
 
-        from serena.config.serena_config import ProjectConfig, SerenaConfig
         config_before = [(path.read_bytes(), path.stat().st_mtime_ns, path.stat().st_ctime_ns) for path in (global_path, project_path)]
-        config = SerenaConfig.from_config_file(generate_if_missing=False)
+        check("ephemeral-serena-home", lambda: prepare_ephemeral_serena_home(global_value, project_value))
+        config_holder: dict[str, Any] = {}
+
+        def load_serena_config() -> str:
+            project_config_class, config_value = load_ephemeral_serena_config()
+            config_holder["project_config_class"] = project_config_class
+            config_holder["config"] = config_value
+            return "loaded from ephemeral clone"
+
+        check("serena-config-load", load_serena_config)
+        ProjectConfig = config_holder["project_config_class"]
+        config = config_holder["config"]
         check("global-no-migration", lambda: require(global_path.read_bytes() == config_before[0][0]
-              and global_path.stat().st_mtime_ns == config_before[0][1] and global_path.stat().st_ctime_ns == config_before[0][2], "global config was rewritten"))
+              and global_path.stat().st_mtime_ns == config_before[0][1] and global_path.stat().st_ctime_ns == config_before[0][2], "persistent global config was rewritten"))
         check("project-no-migration", lambda: require(ProjectConfig._load_yaml_dict(str(project_path))[1] is True
               and project_path.read_bytes() == config_before[1][0] and project_path.stat().st_mtime_ns == config_before[1][1]
-              and project_path.stat().st_ctime_ns == config_before[1][2], "project config was incomplete or rewritten"))
+              and project_path.stat().st_ctime_ns == config_before[1][2], "persistent project config was incomplete or rewritten"))
         check("workspace-pre-registered", lambda: require(config.project_paths == ["/workspace"] and config.get_registered_project("/workspace") is not None, str(config.project_paths)))
-        check("external-state-resolution", lambda: require(config.get_configured_project_serena_folder("/workspace") == "/serena-state/projects/{{SERENA_PROJECT_NAME}}", "literal state resolution failed"))
-        check("no-workspace-serena-fallback", lambda: require(config.get_project_serena_folder("/workspace") == "/serena-state/projects/{{SERENA_PROJECT_NAME}}", "workspace fallback selected"))
+        check("external-state-resolution", lambda: require(config.get_configured_project_serena_folder("/workspace") == str(EPHEMERAL_PROJECT_STATE), "ephemeral state resolution failed"))
+        check("no-workspace-serena-fallback", lambda: require(config.get_project_serena_folder("/workspace") == str(EPHEMERAL_PROJECT_STATE), "workspace fallback selected"))
 
         manifest, raw_manifest, _ = RUNTIME.load_resource_manifest(Path("/serena-resources/current"))
         check("resource-manifest", lambda: require(raw_manifest == RUNTIME.canonical_json_bytes(manifest), "manifest is not canonical"))
@@ -222,8 +283,10 @@ def main() -> int:
             "shellcheck": next(line.split()[-1] for line in command_output(["/serena-state/language_servers/static/BashLanguageServer/bash-lsp/shellcheck/shellcheck-v0.10.0/shellcheck", "--version"]).splitlines() if line.startswith("version:")),
             "pyright": command_output(["node", "-p", "require('/opt/serena-language-servers/node_modules/pyright/package.json').version"]),
             "bash-language-server": command_output(["node", "-p", "require('/opt/serena-language-servers/node_modules/bash-language-server/package.json').version"]),
+            "typescript": command_output(["node", "-p", "require('/opt/serena-language-servers/node_modules/typescript/package.json').version"]),
+            "typescript-language-server": command_output(["node", "-p", "require('/opt/serena-language-servers/node_modules/typescript-language-server/package.json').version"]),
         }
-        expected_versions = {"serena": "1.5.3", "graphify": "0.9.12", "powershell": "7.6.4", "pses": "4.4.0", "psscriptanalyzer": "1.25.0", "shellcheck": "0.10.0", "pyright": "1.1.403", "bash-language-server": "5.6.0"}
+        expected_versions = {"serena": "1.5.3", "graphify": "0.9.12", "powershell": "7.6.4", "pses": "4.4.0", "psscriptanalyzer": "1.25.0", "shellcheck": "0.10.0", "pyright": "1.1.403", "bash-language-server": "5.6.0", "typescript": "5.9.3", "typescript-language-server": "5.1.3"}
         check("versions", lambda: require(versions == expected_versions, f"version mismatch: {versions}"))
         required_paths = [
             "/opt/microsoft/powershell/7/pwsh",
@@ -231,10 +294,29 @@ def main() -> int:
             "/serena-state/language_servers/static/PowerShellLanguageServer/powershell/PowerShellEditorServices/PSScriptAnalyzer/1.25.0/PSScriptAnalyzer.psm1",
             "/serena-state/language_servers/static/PowerShellLanguageServer/powershell/PowerShellEditorServices/PSScriptAnalyzer/1.25.0/PSv7/Microsoft.Windows.PowerShell.ScriptAnalyzer.dll",
             "/serena-state/language_servers/static/BashLanguageServer/bash-lsp/shellcheck/shellcheck-v0.10.0/shellcheck",
+            "/serena-state/language_servers/static/TypeScriptLanguageServer/ts-lsp/node_modules/.bin/typescript-language-server",
             "/opt/serena-language-servers/node_modules/.bin/pyright-langserver",
             "/opt/serena-language-servers/node_modules/.bin/bash-language-server",
+            "/opt/serena-language-servers/node_modules/.bin/typescript-language-server",
+            "/opt/serena-language-servers/node_modules/typescript/bin/tsserver",
         ]
         check("runtime-paths", lambda: require(all(Path(path).is_file() for path in required_paths), "required runtime path missing"))
+        project_languages = project_value.get("languages", [])
+        check("typescript-runtime", lambda: require(
+            "typescript" not in project_languages or (
+                versions["typescript"] == "5.9.3" and versions["typescript-language-server"] == "5.1.3"
+            ),
+            "TypeScript profile runtime mismatch",
+        ))
+        if "rust" in project_languages:
+            rust_version = command_output(["rustc", "--version"])
+            rust_analyzer_version = command_output(["rust-analyzer", "--version"])
+            check("rust-runtime", lambda: require(
+                rust_version.startswith("rustc 1.85.0 ") and bool(rust_analyzer_version),
+                f"Rust profile runtime mismatch: {rust_version}; {rust_analyzer_version}",
+            ))
+        else:
+            check("rust-runtime", lambda: "not selected")
         ldd_outputs = [ldd_output(path) for path in ("/opt/microsoft/powershell/7/pwsh", "/usr/local/bin/node", required_paths[4])]
         check("ldd-closure", lambda: require(all("not found" not in output for output in ldd_outputs), "unresolved ldd dependency"))
         installer_paths = ("/usr/local/bin/npm", "/usr/local/bin/npx", "/usr/local/bin/uvx", "/usr/local/bin/pip", "/usr/bin/apt", "/usr/bin/apt-get", "/usr/bin/dpkg")
@@ -266,9 +348,9 @@ def main() -> int:
             tools = client.request("tools/list", {}, 90)
             names = {item["name"] for item in tools["tools"]}
             check("mcp-allowlist", lambda: require(names == SERENA_TOOLS, f"MCP tool mismatch: {sorted(names)}"))
-            for check_id, relative in (("powershell-semantic-smoke", "tests/fixtures/ai-tooling/sample.ps1"),
-                                       ("bash-semantic-smoke", "tests/fixtures/ai-tooling/sample.sh"),
-                                       ("python-semantic-smoke", "tests/fixtures/ai-tooling/sample.py")):
+            for check_id, relative in (("powershell-semantic-smoke", ".ai/scripts/doctor.ps1"),
+                                       ("bash-semantic-smoke", ".ai/scripts/doctor.sh"),
+                                       ("python-semantic-smoke", ".ai/tooling/doctor.py")):
                 called_tools.append("get_symbols_overview")
                 response = client.request("tools/call", {"name": "get_symbols_overview", "arguments": {"relative_path": relative, "depth": 1}}, 120)
                 check(check_id, lambda response=response: require(successful_mcp_tool_response(response), f"semantic smoke failed: {response}"))

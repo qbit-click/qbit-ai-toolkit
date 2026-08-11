@@ -42,7 +42,7 @@ services:
       - --context
       - /workspace/.serena/codex-single-project.yml
       - --tool-timeout
-      - "45"
+      - "300"
     environment:
       SERENA_HOME: /serena-state
     volumes:
@@ -128,8 +128,6 @@ services:
       - no-new-privileges:true
     tmpfs:
       - /tmp:rw,nosuid,nodev,noexec,mode=1777,size=256m
-      - /serena-state/logs:rw,nosuid,nodev,noexec,mode=0700,uid=10001,gid=10001,size=32m
-      - /serena-state/projects/{{SERENA_PROJECT_NAME}}/cache:rw,nosuid,nodev,noexec,mode=0700,uid=10001,gid=10001,size=64m
     working_dir: /workspace
     entrypoint:
       - python
@@ -155,6 +153,35 @@ services:
       - type: volume
         source: graphify-output
         target: /graphify-output
+        read_only: true
+
+  ai-tooling:
+    image: {{DOCKER_IMAGE_NAME}}
+    platform: linux/amd64
+    build:
+      context: .
+      dockerfile: .ai/tooling/Dockerfile
+      platforms:
+        - linux/amd64
+    user: "10001:10001"
+    cap_drop:
+      - ALL
+    cap_add: []
+    network_mode: none
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,noexec,mode=1777,size=256m
+    working_dir: /workspace
+    entrypoint: []
+    environment:
+      HOME: /tmp
+      XDG_CACHE_HOME: /tmp/cache
+    volumes:
+      - type: bind
+        source: .
+        target: /workspace
         read_only: true
 
 volumes:

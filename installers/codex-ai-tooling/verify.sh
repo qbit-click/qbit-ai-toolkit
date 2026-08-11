@@ -69,11 +69,17 @@ for field in schema_version installer_version profile target_identity payload_ma
   grep -Fq "\"$field\"" "$ownership_manifest" || fail "Ownership manifest field is missing: $field"
 done
 grep -Eq '"payload_manifest_sha256": "[0-9a-f]{64}"' "$ownership_manifest" || fail 'Ownership payload manifest hash is invalid.'
-grep -Eq 'mcp_servers\.(graphify|playwright|sentry)' "$config" && fail 'Only Serena and optional Context7 may be configured as MCP servers.' || true
+grep -Eq 'mcp_servers\.(graphify|playwright)' "$config" && fail 'Graphify and Playwright must not be configured as MCP servers.' || true
 expected_allowlist='enabled_tools = ["get_symbols_overview", "find_symbol", "find_referencing_symbols", "find_implementations", "find_declaration", "get_diagnostics_for_file", "get_diagnostics_for_symbol", "replace_symbol_body", "insert_after_symbol", "insert_before_symbol", "rename_symbol", "safe_delete_symbol"]'
 [ "$(grep -Fxc "$expected_allowlist" "$config")" -eq 1 ] || fail 'Serena enabled_tools must be the exact approved 12-tool allowlist.'
+[ "$(grep -Fxc 'enabled_tools = ["resolve-library-id", "query-docs"]' "$config")" -eq 1 ] || fail 'Context7 enabled_tools must be the exact approved allowlist.'
+[ "$(grep -Fxc 'enabled_tools = ["find_organizations", "find_projects", "get_sentry_resource", "search_events", "search_issues"]' "$config")" -eq 1 ] || fail 'Sentry enabled_tools must be the exact approved read-only allowlist.'
 grep -Fq 'PYTHON_IMAGE=python:3.13.14-slim-trixie@sha256:afe189875f1d2f9b45e287834fb9f2c273a5d59d354ae4050ab9affbf0a6ba06' "$versions" || fail 'Pinned Python image differs.'
 grep -Fq 'NODE_IMAGE=node:24.18.0-trixie-slim@sha256:5301bbf5e8046148348b1dea15436326f43c579031f8d76654a631225bdfe467' "$versions" || fail 'Pinned Node image differs.'
+grep -Fq 'TYPESCRIPT_VERSION=5.9.3' "$versions" || fail 'Pinned TypeScript version differs.'
+grep -Fq 'TYPESCRIPT_LANGUAGE_SERVER_VERSION=5.1.3' "$versions" || fail 'Pinned TypeScript Language Server version differs.'
+grep -Fq 'RUST_TOOLCHAIN_VERSION=1.85.0' "$versions" || fail 'Pinned Rust toolchain differs.'
+grep -Fq 'RUST_BASE_IMAGE=rust:1.85.0-slim-bookworm@sha256:c842cc0357b91bb15ad2bb89934513d0d226f711fac7f7fedb176d3311714d47' "$versions" || fail 'Pinned Rust base image differs.'
 [ "$(sha_file "$root/.ai/tooling/python/requirements.in")" = 9cf619d2a81e2ff3cc59d211ed7fb2ae14b058ccb362914a08043352d30e5eb0 ] || fail 'requirements.in hash mismatch.'
 [ "$(sha_file "$root/.ai/tooling/python/requirements.lock")" = df2ef4ae7599178eddeb53f2e1f378dfecfb668411309c6a5a980e330e83bca1 ] || fail 'requirements.lock hash mismatch.'
 grep -Fq 'network_mode: none' "$compose" || fail 'Runtime network denial is missing.'

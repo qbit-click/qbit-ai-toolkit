@@ -7,6 +7,7 @@ $ErrorActionPreference = 'Stop'
 
 $SerenaAllowlist = @('get_symbols_overview','find_symbol','find_referencing_symbols','find_implementations','find_declaration','get_diagnostics_for_file','get_diagnostics_for_symbol','replace_symbol_body','insert_after_symbol','insert_before_symbol','rename_symbol','safe_delete_symbol')
 $Context7Allowlist = @('resolve-library-id','query-docs')
+$SentryAllowlist = @('find_organizations','find_projects','get_sentry_resource','search_events','search_issues')
 $Failures = 0
 function Fail([string]$Message) { Write-Error $Message; $script:Failures++ }
 function ExtractArray([string]$Text,[string]$Server){ $m=[regex]::Match($Text,"(?ms)\[mcp_servers\."+$Server+"\].*?enabled_tools\s*=\s*\[(.*?)\]"); if(-not $m.Success){return @()}; return @([regex]::Matches($m.Groups[1].Value,'"([^"]+)"') | ForEach-Object {$_.Groups[1].Value}) }
@@ -77,10 +78,15 @@ if(-not(Test-Path -LiteralPath $PortableManifestPath -PathType Leaf)){
 }
 if(-not (SameSet (ExtractArray $Config 'serena') $SerenaAllowlist)){ Fail 'Serena tool allowlist is incorrect.' }
 if(-not (SameSet (ExtractArray $Config 'context7') $Context7Allowlist)){ Fail 'Context7 tool allowlist is incorrect.' }
-if($Config -match 'mcp_servers\.(graphify|playwright|sentry)'){ Fail 'Only Serena and optional Context7 may be configured as MCP servers.' }
+if(-not (SameSet (ExtractArray $Config 'sentry') $SentryAllowlist)){ Fail 'Sentry read-only tool allowlist is incorrect.' }
+if($Config -match 'mcp_servers\.(graphify|playwright)'){ Fail 'Graphify and Playwright must not be configured as MCP servers.' }
 $Versions = Read-TextFile (Join-UnderRoot $Root '.ai/tooling/versions.env')
 if($Versions -notmatch [regex]::Escape('PYTHON_IMAGE=python:3.13.14-slim-trixie@sha256:afe189875f1d2f9b45e287834fb9f2c273a5d59d354ae4050ab9affbf0a6ba06')){ Fail 'Pinned Python image differs.' }
 if($Versions -notmatch [regex]::Escape('NODE_IMAGE=node:24.18.0-trixie-slim@sha256:5301bbf5e8046148348b1dea15436326f43c579031f8d76654a631225bdfe467')){ Fail 'Pinned Node image differs.' }
+if($Versions -notmatch [regex]::Escape('TYPESCRIPT_VERSION=5.9.3')){ Fail 'Pinned TypeScript version differs.' }
+if($Versions -notmatch [regex]::Escape('TYPESCRIPT_LANGUAGE_SERVER_VERSION=5.1.3')){ Fail 'Pinned TypeScript Language Server version differs.' }
+if($Versions -notmatch [regex]::Escape('RUST_TOOLCHAIN_VERSION=1.85.0')){ Fail 'Pinned Rust toolchain differs.' }
+if($Versions -notmatch [regex]::Escape('RUST_BASE_IMAGE=rust:1.85.0-slim-bookworm@sha256:c842cc0357b91bb15ad2bb89934513d0d226f711fac7f7fedb176d3311714d47')){ Fail 'Pinned Rust base image differs.' }
 if((Get-FileSha256 (Join-UnderRoot $Root '.ai/tooling/python/requirements.in')) -cne '9cf619d2a81e2ff3cc59d211ed7fb2ae14b058ccb362914a08043352d30e5eb0'){ Fail 'requirements.in hash mismatch.' }
 if((Get-FileSha256 (Join-UnderRoot $Root '.ai/tooling/python/requirements.lock')) -cne 'df2ef4ae7599178eddeb53f2e1f378dfecfb668411309c6a5a980e330e83bca1'){ Fail 'requirements.lock hash mismatch.' }
 $Compose = Read-TextFile (Join-UnderRoot $Root '.ai/tooling/compose.yaml')

@@ -54,6 +54,10 @@ $Values = @{
   PROJECT_DESCRIPTION = if ($SelectedProfile -eq 'typescript') { 'a TypeScript repository.' } elseif ($SelectedProfile -eq 'rust') { 'a Rust repository.' } else { 'a generic repository.' }
   SERENA_VERSION = '1.5.3'
   GRAPHIFY_VERSION = '0.9.12'
+  TYPESCRIPT_VERSION = '5.9.3'
+  TYPESCRIPT_LANGUAGE_SERVER_VERSION = '5.1.3'
+  RUST_TOOLCHAIN_VERSION = '1.85.0'
+  RUST_BASE_IMAGE = 'rust:1.85.0-slim-bookworm@sha256:c842cc0357b91bb15ad2bb89934513d0d226f711fac7f7fedb176d3311714d47'
 }
 
 $InstallerRoot = Split-Path -Parent $PSScriptRoot

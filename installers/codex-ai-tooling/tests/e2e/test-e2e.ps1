@@ -61,7 +61,10 @@ try {
     $State = Get-Content (Join-Path $Repo '.qbit/toolkit/installed/codex-ai-tooling.json') -Raw | ConvertFrom-Json
     Assert ($State.profile -eq 'generic') 'Generic profile was not selected.'
     & $Verify -Target $Repo
-    Assert ((ReadText (Join-Path $Repo '.codex/config.toml')) -match 'enabled = false') 'Serena should be disabled for generic profile.'
+    $Config = ReadText (Join-Path $Repo '.codex/config.toml')
+    Assert ($Config.Contains('[mcp_servers.serena]') -and $Config.Contains('enabled = true')) 'Serena should remain enabled for the generic semantic profile.'
+    $Project = ReadText (Join-Path $Repo '.serena/project.yml')
+    foreach($Language in @('powershell','bash','python')) { Assert ($Project.Contains("  - $Language")) "Generic Serena language is missing: $Language" }
     & $Uninstall -Target $Repo
     Assert (Test-Path (Join-Path $Repo 'UNRELATED.txt')) 'Unrelated content was removed.'
   }

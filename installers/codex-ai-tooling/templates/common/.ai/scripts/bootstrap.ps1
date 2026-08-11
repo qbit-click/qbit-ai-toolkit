@@ -120,6 +120,8 @@ foreach ($property in $dependenciesProperty.Value.PSObject.Properties) {
 $expectedDependencies = @{
     'bash-language-server' = '5.6.0'
     'pyright' = '1.1.403'
+    'typescript' = '5.9.3'
+    'typescript-language-server' = '5.1.3'
 }
 
 if ($actualDependencies.Count -ne $expectedDependencies.Count) {
@@ -164,6 +166,8 @@ $arguments = @('compose', '--project-directory', $root, '-f', $compose, 'build')
 if ($Clean) { $arguments += @('--pull', '--no-cache') }
 & docker @arguments
 if ($LASTEXITCODE -ne 0) { throw 'Docker image build failed.' }
+& docker compose --project-directory $root -f $compose run --rm -T --no-deps serena true
+if ($LASTEXITCODE -ne 0) { throw 'Serena state/resource preparation failed.' }
 $afterIndex = Get-GitIndexSnapshot
-if ($afterIndex -cne $beforeIndex) { throw 'Git index changed during the AI tooling build.' }
-Write-Host 'Project-local AI image build completed without starting services or mutating the Git index.'
+if ($afterIndex -cne $beforeIndex) { throw 'Git index changed during the AI tooling bootstrap.' }
+Write-Host 'Project-local AI image and Serena state/resources prepared without starting MCP services or mutating the Git index.'

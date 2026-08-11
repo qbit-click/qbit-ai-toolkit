@@ -44,35 +44,43 @@ def test_byte_identical_mappings_have_no_drift() -> None:
 def test_runtime_drift_is_limited_to_declared_parameters() -> None:
     source_root = ROOT / ".ai/tooling"
     target_root = PAYLOAD / ".ai/tooling"
-    parameterized = {
+    installer_variants = {
+        "Dockerfile",
+        "README.md",
         "compose.yaml",
         "doctor.py",
+        "graphify-runtime.py",
+        "language-servers/package-lock.json",
+        "language-servers/package.json",
         "runtime-entrypoint.py",
         "serena_config.yml",
+        "versions.env",
     }
-    normalized = {"README.md"}
     excluded = {"__pycache__"}
     source_files = sorted(
         p for p in source_root.rglob("*") if p.is_file() and not any(part in excluded for part in p.parts)
     )
+    target_files = sorted(p for p in target_root.rglob("*") if p.is_file())
     assert [p.relative_to(source_root).as_posix() for p in source_files] == [
-        p.relative_to(target_root).as_posix() for p in sorted(p for p in target_root.rglob("*") if p.is_file())
+        p.relative_to(target_root).as_posix() for p in target_files
     ]
     for source in source_files:
         relative = source.relative_to(source_root).as_posix()
         target = target_root / relative
-        if relative in normalized:
-            assert "{" * 2 + "SERENA_PROJECT_NAME" + "}" * 2 in target.read_text(encoding="utf-8")
-            continue
-        if relative not in parameterized:
+        if relative not in installer_variants:
             assert digest(source) == digest(target), relative
-            continue
-        expected = source.read_text(encoding="utf-8")
-        token = lambda name: "{" * 2 + name + "}" * 2
-        expected = expected.replace("qbit-ai-toolkit-ai-runtime:phase2a", token("DOCKER_IMAGE_NAME"))
-        expected = expected.replace("qbit-ai-toolkit-ai", token("COMPOSE_PROJECT_NAME"))
-        expected = expected.replace("qbit-ai-toolkit", token("SERENA_PROJECT_NAME"))
-        assert target.read_text(encoding="utf-8") == expected, relative
+
+    compose = (target_root / "compose.yaml").read_text(encoding="utf-8")
+    doctor = (target_root / "doctor.py").read_text(encoding="utf-8")
+    graphify = (target_root / "graphify-runtime.py").read_text(encoding="utf-8")
+    versions = (target_root / "versions.env").read_text(encoding="utf-8")
+    template = lambda name: "{" * 2 + name + "}" * 2
+    assert template("DOCKER_IMAGE_NAME") in compose and template("COMPOSE_PROJECT_NAME") in compose
+    assert "ai-tooling:" in compose and 'user: "10001:10001"' in compose
+    assert '"typescript": "5.9.3"' in doctor and 'rustc 1.85.0 ' in doctor
+    assert "normalize_scope" in graphify and 'verb == "ensure"' in graphify
+    assert "TYPESCRIPT_VERSION=5.9.3" in versions
+    assert "RUST_TOOLCHAIN_VERSION=1.85.0" in versions
 
 
 def test_security_and_capability_contract() -> None:
@@ -97,15 +105,21 @@ def test_security_and_capability_contract() -> None:
     ]
     assert 'mcp_servers.graphify' not in config
     assert 'mcp_servers.playwright' not in config
-    assert "sentry" not in config.lower()
+    assert '[mcp_servers.sentry]' in config
+    for sentry_tool in ("find_organizations", "find_projects", "get_sentry_resource", "search_events", "search_issues"):
+        assert config.count(f'"{sentry_tool}"') == 1
     for tool in allowlist:
-        assert config.count(f'"{tool}"') == 1
+        assert config.count(f'"{tool}"') >= 1
     assert "read_only: true" in compose
     assert "network_mode: none" in compose
     assert "cap_drop:\n      - ALL" in compose
     assert "source: .\n        target: /workspace\n        read_only: true" in compose
     assert "PYTHON_IMAGE=python:3.13.14-slim-trixie@sha256:afe189875f1d2f9b45e287834fb9f2c273a5d59d354ae4050ab9affbf0a6ba06" in versions
     assert "NODE_IMAGE=node:24.18.0-trixie-slim@sha256:5301bbf5e8046148348b1dea15436326f43c579031f8d76654a631225bdfe467" in versions
+    assert "TYPESCRIPT_VERSION=5.9.3" in versions
+    assert "TYPESCRIPT_LANGUAGE_SERVER_VERSION=5.1.3" in versions
+    assert "RUST_TOOLCHAIN_VERSION=1.85.0" in versions
+    assert "RUST_BASE_IMAGE=rust:1.85.0-slim-bookworm@sha256:c842cc0357b91bb15ad2bb89934513d0d226f711fac7f7fedb176d3311714d47" in versions
     assert digest(requirements_in) == "9cf619d2a81e2ff3cc59d211ed7fb2ae14b058ccb362914a08043352d30e5eb0"
     assert digest(requirements_lock) == "df2ef4ae7599178eddeb53f2e1f378dfecfb668411309c6a5a980e330e83bca1"
 

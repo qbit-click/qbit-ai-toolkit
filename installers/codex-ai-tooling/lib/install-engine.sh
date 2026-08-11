@@ -144,7 +144,11 @@ render_file() {
     -e "s/$(template_token LANGUAGE_SUMMARY)/$(sed_escape "$language_summary")/g" \
     -e "s/$(template_token PROJECT_DESCRIPTION)/$(sed_escape "$project_description")/g" \
     -e "s/$(template_token SERENA_VERSION)/1.5.3/g" \
-    -e "s/$(template_token GRAPHIFY_VERSION)/0.9.12/g" "$src" > "$dst"
+    -e "s/$(template_token GRAPHIFY_VERSION)/0.9.12/g" \
+    -e "s/$(template_token TYPESCRIPT_VERSION)/5.9.3/g" \
+    -e "s/$(template_token TYPESCRIPT_LANGUAGE_SERVER_VERSION)/5.1.3/g" \
+    -e "s/$(template_token RUST_TOOLCHAIN_VERSION)/1.85.0/g" \
+    -e "s/$(template_token RUST_BASE_IMAGE)/$(sed_escape 'rust:1.85.0-slim-bookworm@sha256:c842cc0357b91bb15ad2bb89934513d0d226f711fac7f7fedb176d3311714d47')/g" "$src" > "$dst"
 }
 sha_file() { if command -v sha256sum >/dev/null 2>&1; then sha256sum "$1" | awk '{print $1}'; else shasum -a 256 "$1" | awk '{print $1}'; fi; }
 plan_dir=$(mktemp -d 2>/dev/null || mktemp -d -t qbit-plan)

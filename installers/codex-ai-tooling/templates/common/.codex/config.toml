@@ -1,6 +1,51 @@
 # Project-scoped MCP configuration. Codex loads this only after the repository is trusted.
 # No user-level Codex configuration is required or changed by this repository.
 
+[mcp_servers.serena]
+command = "docker"
+args = [
+  "compose", "--env-file", ".ai/tooling/versions.env", "-f", ".ai/tooling/compose.yaml",
+  "--project-directory", ".", "run", "--rm", "-T", "--build", "--quiet-build", "serena",
+]
+cwd = "."
+enabled = true
+required = false
+startup_timeout_sec = 300
+tool_timeout_sec = 300
+default_tools_approval_mode = "prompt"
+enabled_tools = ["get_symbols_overview", "find_symbol", "find_referencing_symbols", "find_implementations", "find_declaration", "get_diagnostics_for_file", "get_diagnostics_for_symbol", "replace_symbol_body", "insert_after_symbol", "insert_before_symbol", "rename_symbol", "safe_delete_symbol"]
+
+[mcp_servers.serena.env]
+COMPOSE_STATUS_STDOUT = "0"
+COMPOSE_ANSI = "never"
+COMPOSE_PROGRESS = "quiet"
+COMPOSE_MENU = "0"
+
+[mcp_servers.serena.tools.get_symbols_overview]
+approval_mode = "auto"
+[mcp_servers.serena.tools.find_symbol]
+approval_mode = "auto"
+[mcp_servers.serena.tools.find_referencing_symbols]
+approval_mode = "auto"
+[mcp_servers.serena.tools.find_implementations]
+approval_mode = "auto"
+[mcp_servers.serena.tools.find_declaration]
+approval_mode = "auto"
+[mcp_servers.serena.tools.get_diagnostics_for_file]
+approval_mode = "auto"
+[mcp_servers.serena.tools.get_diagnostics_for_symbol]
+approval_mode = "auto"
+[mcp_servers.serena.tools.replace_symbol_body]
+approval_mode = "prompt"
+[mcp_servers.serena.tools.insert_after_symbol]
+approval_mode = "prompt"
+[mcp_servers.serena.tools.insert_before_symbol]
+approval_mode = "prompt"
+[mcp_servers.serena.tools.rename_symbol]
+approval_mode = "prompt"
+[mcp_servers.serena.tools.safe_delete_symbol]
+approval_mode = "prompt"
+
 [mcp_servers.context7]
 url = "https://mcp.context7.com/mcp"
 auth = "oauth"
@@ -8,18 +53,15 @@ enabled = true
 required = false
 startup_timeout_sec = 20
 tool_timeout_sec = 45
-default_tools_approval_mode = "prompt"
+default_tools_approval_mode = "auto"
 enabled_tools = ["resolve-library-id", "query-docs"]
 
-[mcp_servers.context7.env_http_headers]
-CONTEXT7_API_KEY = "CONTEXT7_API_KEY"
-
-[mcp_servers.serena]
-command = "docker"
-args = ["compose", "--project-directory", ".", "-f", ".ai/tooling/compose.yaml", "run", "--rm", "-T", "serena"]
+[mcp_servers.sentry]
+url = "https://mcp.sentry.dev/mcp"
+auth = "oauth"
 enabled = true
 required = false
-startup_timeout_sec = 60
+startup_timeout_sec = 20
 tool_timeout_sec = 45
-default_tools_approval_mode = "prompt"
-enabled_tools = ["get_symbols_overview", "find_symbol", "find_referencing_symbols", "find_implementations", "find_declaration", "get_diagnostics_for_file", "get_diagnostics_for_symbol", "replace_symbol_body", "insert_after_symbol", "insert_before_symbol", "rename_symbol", "safe_delete_symbol"]
+default_tools_approval_mode = "auto"
+enabled_tools = ["find_organizations", "find_projects", "get_sentry_resource", "search_events", "search_issues"]
