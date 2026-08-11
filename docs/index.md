@@ -1,6 +1,6 @@
 ---
 id: index
-slug: /
+slug: /overview
 title: Qbit AI Toolkit
 sidebar_label: Overview
 sidebar_position: 1
@@ -30,11 +30,15 @@ This documentation is part of the repository's versioned source of truth. Archit
 
 The documentation site is built with Docusaurus from the canonical Markdown under `docs/`. The Docusaurus application itself lives under `website/` and does not own the documentation content.
 
-## Where to start
+## Documentation domains
+
+The documentation is split into independent domains so each area can grow without turning the sidebar into a single mixed hierarchy:
 
 - [Getting started](./getting-started.md) — repository and documentation workflow.
-- [Codex AI Tooling](./codex-ai-tooling.md) — installer lifecycle and safety model.
-- [Architecture](./architecture.md) — repository boundaries and ownership.
-- [Asset contract](./asset-contract.md) — catalog metadata and consumer contract.
-- [Security](./security.md) — trust boundaries and secret-handling rules.
-- [Versioning](./versioning.md) — immutable versions and compatibility expectations.
+- [Prompt Engineering](./prompt-engineering/index.md) — writing, structuring, and evaluating prompts.
+- [AI Tools](./ai-tools/index.md) — setup scripts, reusable assets, Codex AI Tooling, and repository-local tooling.
+- [MCP](./mcp/index.md) — configuration, usage, capability boundaries, and security for Model Context Protocol integrations.
+- [Agents & Skills](./agents/index.md) — building skills, ready-made skills, and reusable agent policies.
+- [Engineering reference](./engineering/index.md) — architecture, asset contracts, conventions, security, and versioning.
+
+The top navigation opens the relevant domain; each domain then exposes only its own topics in the sidebar.

@@ -1,0 +1,49 @@
+---
+id: index
+title: مهندسی پرامپت
+sidebar_label: معرفی
+---
+
+# مهندسی پرامپت
+
+مهندسی پرامپت یعنی طراحی ورودی‌ها، دستورها، مثال‌ها، context، دسترسی به ابزارها و قرارداد خروجی به شکلی که رفتار سیستم AI برای مأموریت موردنظر تا حد کافی قابل پیش‌بینی و قابل آزمون باشد. این حوزه مجموعه‌ای از «عبارت‌های جادویی» نیست؛ در کاربردهای مدرن بیشتر به طراحی interface و workflow شباهت دارد: هدف را روشن کنید، فقط context مؤثر را بدهید، موفقیت را قابل اندازه‌گیری تعریف کنید و نتیجه را تست کنید.
+
+این راهنما از جزوه فارسی *مهندسی پرامپت v4* بازسازمان‌دهی شده و در **۲۰۲۶-۰۸-۱۰** با راهنمای فعلی مدل‌ها و APIها بازبینی فنی شده است. تکنیک‌های تاریخی جزوه حذف نشده‌اند، اما از توصیه‌های production امروزی جدا شده‌اند.
+
+## مسیر یادگیری
+
+### مبانی
+
+1. **مبانی** — پرامپت چیست، context چگونه کار می‌کند و نقش‌های دستور چه تفاوتی دارند.
+2. **نوشتن پرامپت مؤثر** — هدف، context، محدودیت‌ها، قرارداد خروجی، رفتار در نبود داده و معیار پذیرش.
+
+### تکنیک‌ها
+
+3. **الگوهای پرامپت** — zero-shot، few-shot، مثال‌ها، مرحله‌بندی، بازبینی، استخراج ساختاریافته و کار با ابزار.
+4. **استدلال و الگوهای ایجنتی** — Chain-of-Thought، Self-Consistency، ReAct و Tree of Thoughts به‌عنوان الگوهای پژوهشی/تاریخی و نحوه استفاده درست از مدل‌های reasoning جدید.
+
+### سیستم‌ها و Workflowها
+
+5. **سیستم‌های پرامپت و Orchestration** — workflow در برابر agent-driven control، Skillها، manager/handoff، جداسازی context و handoff ساختاریافته.
+6. **Clarification و Verification Loop** — readiness gate، clarify-before-execute، repair loop محدود، stop condition و runtime verification.
+
+### Production و API
+
+7. **API و کنترل‌های مدل** — Responses API، نقش پیام‌ها، Structured Outputs، ابزارها، reasoning effort، sampling و version pinning.
+8. **Context و grounding** — context window، conversation state، حافظه ChatGPT، ابزارها و RAG.
+9. **امنیت** — prompt injection، system-prompt leakage، least privilege، validation خروجی و تأیید انسانی عملیات پرریسک.
+
+### مثال و تمرین
+
+10. **تمپلیت‌ها و مثال‌ها** — آموزش، خلاصه‌سازی، دیباگ، پشتیبانی، RAG، استخراج داده و engineering handoff.
+11. **ارزیابی** — eval set، rubric، regression test، adversarial cases و versioning پرامپت.
+12. **تمرین‌ها** — تمرین‌های عملی همراه پاسخ پیشنهادی.
+13. **واژه‌نامه و منابع** — اصطلاحات، مقالات پایه و منابع عملیاتی به‌روز.
+
+## ارتباط با repository
+
+پرامپت‌های reusable در `prompts/` قرار می‌گیرند. این بخش روش طراحی و ارزیابی آن‌ها را توضیح می‌دهد؛ خود promptهای production باید به‌صورت asset نسخه‌دار همراه ownership، consumer و acceptance test مشخص نگه‌داری شوند.
+
+## اصل کلیدی
+
+پرامپت خوب فضای حدس‌زدن غیرضروری را کم می‌کند، اما به‌تنهایی صحت، امنیت، authorization یا factuality را تضمین نمی‌کند. این ویژگی‌ها به انتخاب مدل، داده grounded، کنترل‌های deterministic برنامه، مجوز ابزارها، validation و eval نیاز دارند.

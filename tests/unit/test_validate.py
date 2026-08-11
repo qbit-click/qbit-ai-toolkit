@@ -147,6 +147,24 @@ class ValidateUnitTests(unittest.TestCase):
         validate.validate_content_hygiene()
         self.assertTrue(any("Forbidden absolute path" in item for item in validate.errors))
 
+    def test_codexpro_documentation_may_contain_reference_absolute_paths(self) -> None:
+        forbidden = "C:\\Users\\example\\.codexpro\\Start-CodexPro.ps1\n"
+        write_text(self.root / "docs" / "ai-tools" / "codexpro" / "windows-setup.md", forbidden)
+        write_text(
+            self.root
+            / "website"
+            / "i18n"
+            / "fa"
+            / "docusaurus-plugin-content-docs"
+            / "current"
+            / "ai-tools"
+            / "codexpro"
+            / "windows-setup.md",
+            forbidden,
+        )
+        validate.validate_content_hygiene()
+        self.assertFalse(any("Forbidden absolute path" in item for item in validate.errors))
+
     def test_placeholder_is_not_secret_but_secret_is_detected(self) -> None:
         write_text(self.root / "placeholder.txt", "CONTEXT7_API_KEY=\n")
         write_text(self.root / "secret.txt", "sk-" + ("A" * 24) + "\n")

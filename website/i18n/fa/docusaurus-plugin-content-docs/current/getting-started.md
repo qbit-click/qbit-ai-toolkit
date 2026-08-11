@@ -45,6 +45,16 @@ bun run start
 bun run start:fa
 ```
 
+دستورهای `start` و `start:fa` فقط یک locale را در حالت توسعه اجرا می‌کنند. برای بررسی language switcher و جابه‌جایی واقعی میان فارسی و انگلیسی از آن‌ها استفاده نکنید.
+
+برای preview کامل و مشابه production که هر دو زبان را هم‌زمان سرو می‌کند:
+
+```bash
+bun run preview
+```
+
+در preview، نسخه انگلیسی در `/` و نسخه فارسی در `/fa/` در دسترس است و language switcher باید میان این دو مسیر کار کند.
+
 برای build نهایی هر دو زبان:
 
 ```bash

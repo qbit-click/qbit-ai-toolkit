@@ -15,21 +15,33 @@
     "message": "شروع کار",
     "description": "The label of footer link with label=Getting started linking to /getting-started"
   },
-  "link.item.label.Codex AI Tooling": {
-    "message": "ابزارهای Codex AI",
-    "description": "The label of footer link with label=Codex AI Tooling linking to /codex-ai-tooling"
+  "link.item.label.Prompt Engineering": {
+    "message": "مهندسی پرامپت",
+    "description": "The label of footer link with label=Prompt Engineering linking to /prompt-engineering/"
   },
-  "link.item.label.Security": {
-    "message": "امنیت",
-    "description": "The label of footer link with label=Security linking to /security"
+  "link.item.label.AI Tools": {
+    "message": "ابزارهای AI",
+    "description": "The label of footer link with label=AI Tools linking to /ai-tools/"
+  },
+  "link.item.label.MCP": {
+    "message": "MCP",
+    "description": "The label of footer link with label=MCP linking to /mcp/"
+  },
+  "link.item.label.Agents & Skills": {
+    "message": "ایجنت‌ها و اسکیل‌ها",
+    "description": "The label of footer link with label=Agents & Skills linking to /agents/"
+  },
+  "link.item.label.Engineering reference": {
+    "message": "مرجع مهندسی",
+    "description": "The label of footer link with label=Engineering reference linking to /engineering/"
   },
   "link.item.label.Architecture": {
     "message": "معماری",
     "description": "The label of footer link with label=Architecture linking to /architecture"
   },
-  "link.item.label.Asset contract": {
-    "message": "قرارداد دارایی‌ها",
-    "description": "The label of footer link with label=Asset contract linking to /asset-contract"
+  "link.item.label.Security": {
+    "message": "امنیت",
+    "description": "The label of footer link with label=Security linking to /security"
   },
   "link.item.label.Versioning": {
     "message": "نسخه‌بندی",

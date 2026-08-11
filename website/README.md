@@ -27,6 +27,16 @@ Run Persian locally:
 bun run start:fa
 ```
 
+`start` and `start:fa` are single-locale development servers. Docusaurus does not serve all locales at the same time in dev mode, so do not use the locale dropdown to validate bilingual navigation from those commands.
+
+Preview the complete production-like bilingual site, including the English/Persian language switcher:
+
+```bash
+bun run preview
+```
+
+The preview command builds all configured locales and serves the generated site at `http://127.0.0.1:3000/`. Persian is available under `/fa/`.
+
 Validate TypeScript and build both locales:
 
 ```bash

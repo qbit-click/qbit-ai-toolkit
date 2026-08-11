@@ -40,7 +40,11 @@ SERENA_TOOLS = ["get_symbols_overview", "find_symbol", "find_referencing_symbols
 SENTRY_TOOLS = ["find_organizations", "find_projects", "get_sentry_resource", "search_events", "search_issues"]
 CONTEXT7_TOOLS = ["resolve-library-id", "query-docs"]
 ALLOW_ABSOLUTE_EXAMPLES = {"D:\\Projects\\Example\\Backend", "/projects/example/backend"}
-AI_INDEX_ENTRY = "100644 4f27a8534d4e95b5f558295b0f45da6e4e4da197 0\t.gitignore"
+ABSOLUTE_PATH_DOCUMENTATION_PREFIXES = (
+    "docs/ai-tools/codexpro/",
+    "website/i18n/fa/docusaurus-plugin-content-docs/current/ai-tools/codexpro/",
+)
+AI_INDEX_ENTRY = "100644 a748023e65eac08492156379097aadfdde8ea686 0\t.gitignore"
 AI_GLOBAL_KEYS = {
     "language_backend", "line_ending", "gui_log_window", "web_dashboard", "web_dashboard_open_on_launch",
     "web_dashboard_interface", "web_dashboard_listen_address", "jetbrains_plugin_server_address", "log_level",
@@ -279,7 +283,7 @@ def validate_content_hygiene() -> None:
             error(f"Real-looking secret found: {name}")
         if FLOATING.search(text):
             error(f"Floating version selector found: {name}")
-        if ABS_PATH.search(text):
+        if ABS_PATH.search(text) and not name.startswith(ABSOLUTE_PATH_DOCUMENTATION_PREFIXES):
             cleaned = text
             for allowed in ALLOW_ABSOLUTE_EXAMPLES:
                 cleaned = cleaned.replace(allowed, "")

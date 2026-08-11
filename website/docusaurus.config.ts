@@ -5,7 +5,7 @@ import type {Options, ThemeConfig} from '@docusaurus/preset-classic';
 const config: Config = {
   title: 'Qbit AI Toolkit',
   tagline: 'Versioned AI development tooling, installers, contracts, and reusable assets for the Qbit ecosystem.',
-  favicon: 'img/favicon.ico',
+  favicon: 'img/qbit-ai-toolkit-logo.svg',
 
   future: {
     v4: true,
@@ -15,7 +15,6 @@ const config: Config = {
   baseUrl: '/',
   organizationName: 'qbit-click',
   projectName: 'qbit-ai-toolkit',
-  deploymentBranch: 'gh-pages',
   trailingSlash: false,
   onBrokenLinks: 'throw',
 
@@ -61,10 +60,17 @@ const config: Config = {
     ],
     navbar: {
       title: 'Qbit AI Toolkit',
+      logo: {
+        alt: 'Qbit AI Toolkit logo',
+        src: 'img/qbit-ai-toolkit-logo.svg',
+      },
       items: [
-        {to: '/', label: 'Docs', position: 'left'},
-        {to: '/codex-ai-tooling', label: 'Codex AI Tooling', position: 'left'},
-        {to: '/architecture', label: 'Architecture', position: 'left'},
+        {to: '/', label: 'Start', position: 'left'},
+        {type: 'docSidebar', sidebarId: 'promptEngineering', label: 'Prompt Engineering', position: 'left'},
+        {type: 'docSidebar', sidebarId: 'aiTools', label: 'AI Tools', position: 'left'},
+        {type: 'docSidebar', sidebarId: 'mcp', label: 'MCP', position: 'left'},
+        {type: 'docSidebar', sidebarId: 'agentsAndSkills', label: 'Agents & Skills', position: 'left'},
+        {type: 'docSidebar', sidebarId: 'engineering', label: 'Engineering', position: 'left'},
         {type: 'localeDropdown', position: 'right'},
         {
           href: 'https://github.com/qbit-click/qbit-ai-toolkit',
@@ -80,15 +86,18 @@ const config: Config = {
           title: 'Documentation',
           items: [
             {label: 'Getting started', to: '/getting-started'},
-            {label: 'Codex AI Tooling', to: '/codex-ai-tooling'},
-            {label: 'Security', to: '/security'},
+            {label: 'Prompt Engineering', to: '/prompt-engineering/'},
+            {label: 'AI Tools', to: '/ai-tools/'},
+            {label: 'MCP', to: '/mcp/'},
+            {label: 'Agents & Skills', to: '/agents/'},
           ],
         },
         {
           title: 'Engineering',
           items: [
+            {label: 'Engineering reference', to: '/engineering/'},
             {label: 'Architecture', to: '/architecture'},
-            {label: 'Asset contract', to: '/asset-contract'},
+            {label: 'Security', to: '/security'},
             {label: 'Versioning', to: '/versioning'},
           ],
         },

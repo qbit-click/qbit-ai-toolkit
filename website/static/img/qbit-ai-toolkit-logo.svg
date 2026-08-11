@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title desc">
+  <title id="title">Qbit AI Toolkit</title>
+  <desc id="desc">A stylized Q with an orbital ring and circuit nodes.</desc>
+  <defs>
+    <linearGradient id="qbit-ring" x1="22" y1="20" x2="104" y2="110" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#2536b8"/>
+      <stop offset="0.52" stop-color="#175de0"/>
+      <stop offset="1" stop-color="#24c8ff"/>
+    </linearGradient>
+    <linearGradient id="qbit-orbit" x1="14" y1="91" x2="113" y2="38" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#3150df"/>
+      <stop offset="0.55" stop-color="#20a8ff"/>
+      <stop offset="1" stop-color="#31dcff"/>
+    </linearGradient>
+    <filter id="qbit-glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.2" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <path d="M88 88.5a41 41 0 1 1 7.6-11.4" fill="none" stroke="url(#qbit-ring)" stroke-width="15" stroke-linecap="round"/>
+  <path d="M76.5 78.5 104 108 88.5 105 66 80Z" fill="url(#qbit-ring)"/>
+
+  <path d="M17 89C34 103 72 99 104 70c13-12 18-24 12-31-6-7-19-5-31 1" fill="none" stroke="#17279b" stroke-width="8" stroke-linecap="round" opacity=".9"/>
+  <path d="M15 85c21 15 61 9 91-17 11-10 16-19 14-26" fill="none" stroke="url(#qbit-orbit)" stroke-width="4.5" stroke-linecap="round"/>
+
+  <path d="M29 82h10l9 9h9" fill="none" stroke="#30d5ff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M42 70v8l11 11" fill="none" stroke="#30d5ff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="28" cy="82" r="5.5" fill="#1b56d8" stroke="#58e4ff" stroke-width="2" filter="url(#qbit-glow)"/>
+  <circle cx="42" cy="69" r="4" fill="#173bb7" stroke="#58e4ff" stroke-width="1.8"/>
+  <circle cx="109" cy="61" r="7.5" fill="#14aef4" stroke="#72ebff" stroke-width="2.2" filter="url(#qbit-glow)"/>
+  <circle cx="111.5" cy="58.5" r="2.2" fill="#fff" opacity=".95"/>
+</svg>

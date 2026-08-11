@@ -45,6 +45,16 @@ To run the Persian locale locally:
 bun run start:fa
 ```
 
+`start` and `start:fa` are single-locale development workflows. Use them while editing one locale, not to validate the language switcher.
+
+To preview both English and Persian together with production-like routing:
+
+```bash
+bun run preview
+```
+
+The preview builds all configured locales and serves them from one local site. English is available at `/` and Persian at `/fa/`; use this mode when validating the locale dropdown and cross-locale navigation.
+
 Build both locales before publishing:
 
 ```bash

@@ -1,6 +1,6 @@
 ---
 id: index
-slug: /
+slug: /overview
 title: کیوبیت AI تولکیت
 sidebar_label: معرفی
 sidebar_position: 1
@@ -30,11 +30,15 @@ qbit-console        ─┼── مصرف دارایی‌های نسخه‌دا�
 
 محتوای مرجع در `docs/` قرار دارد و برنامه Docusaurus در `website/` فقط لایه نمایش، ترجمه و انتشار سایت است.
 
-## از کجا شروع کنیم؟
+## حوزه‌های مستندات
 
-- [شروع کار](./getting-started.md)
-- [Codex AI Tooling](./codex-ai-tooling.md)
-- [معماری](./architecture.md)
-- [قرارداد دارایی‌ها](./asset-contract.md)
-- [امنیت](./security.md)
-- [نسخه‌بندی](./versioning.md)
+مستندات به domainهای مستقل تقسیم شده‌اند تا هر بخش بدون تبدیل کردن sidebar به یک فهرست طولانی و مخلوط رشد کند:
+
+- [شروع کار](./getting-started.md) — workflow repository و توسعه مستندات.
+- [مهندسی پرامپت](./prompt-engineering/index.md) — نوشتن، ساختاربندی و ارزیابی prompt.
+- [ابزارهای AI](./ai-tools/index.md) — اسکریپت‌های راه‌اندازی، assetهای reusable، Codex AI Tooling و tooling محلی repository.
+- [MCP](./mcp/index.md) — پیکربندی، استفاده، capability boundary و امنیت integrationهای Model Context Protocol.
+- [ایجنت‌ها و اسکیل‌ها](./agents/index.md) — ساخت skill، skillهای آماده و policyهای reusable agent.
+- [مرجع مهندسی](./engineering/index.md) — معماری، قرارداد asset، conventionها، امنیت و versioning.
+
+Navbar ورودی هر domain است و sidebar فقط topicهای همان حوزه را نمایش می‌دهد.

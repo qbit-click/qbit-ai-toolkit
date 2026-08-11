@@ -18,7 +18,7 @@ ROOT = Path(__file__).resolve().parents[2]
 COMPOSE = ROOT / ".ai/tooling/compose.yaml"
 PROJECT = f"qbit-phase2-{uuid.uuid4().hex[:12]}"
 EXPECTED_IMAGE = "qbit-ai-toolkit-ai-runtime:phase2a"
-EXPECTED_INDEX_ENTRY = "100644 4f27a8534d4e95b5f558295b0f45da6e4e4da197 0\t.gitignore"
+EXPECTED_INDEX_ENTRY = "100644 a748023e65eac08492156379097aadfdde8ea686 0\t.gitignore"
 EXPECTED_TOOLS = {
     "get_symbols_overview", "find_symbol", "find_referencing_symbols", "find_implementations",
     "find_declaration", "get_diagnostics_for_file", "get_diagnostics_for_symbol", "replace_symbol_body",
