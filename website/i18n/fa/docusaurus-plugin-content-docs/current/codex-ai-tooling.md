@@ -18,7 +18,9 @@ manifest فعلی Windows، Linux و macOS و profileهای زیر را اعلا
 - `typescript`: profile مخصوص TypeScript.
 - `rust`: profile مخصوص Rust.
 
-صرف وجود یک profile در manifest به معنی release-ready بودن آن نیست؛ templateها، dependency pinها، تست‌ها و validation repository نیز باید کامل باشند.
+Profileهای `generic`، `typescript` و `rust` اکنون template و runtime contract واقعی دارند. TypeScript با TypeScript 5.9.3 و TypeScript Language Server 5.1.3 اجرا می‌شود؛ Rust نیز toolchain نسخه 1.85.0 و `rust-analyzer` را از image pin‌شده استفاده می‌کند. Repository validation و installer testها readiness این profileها را enforce می‌کنند.
+
+برای commandهای نصب و lifecycle به [راهنمای استفاده از Installer](./ai-tools/codex-ai-tooling-installer.md) مراجعه کنید.
 
 ## عملیات lifecycle
 

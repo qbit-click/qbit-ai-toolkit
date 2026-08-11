@@ -69,7 +69,12 @@ const sidebars: SidebarsConfig = {
       collapsed: false,
       items: ['ai-tools/codexpro/index', 'ai-tools/codexpro/windows-setup'],
     },
-    'codex-ai-tooling',
+    {
+      type: 'category',
+      label: 'Codex AI Tooling installer',
+      collapsed: false,
+      items: ['codex-ai-tooling', 'ai-tools/codex-ai-tooling-installer'],
+    },
     {
       type: 'category',
       label: 'Setup & reusable assets',

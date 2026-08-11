@@ -18,7 +18,9 @@ The manifest currently declares Windows, Linux, and macOS support with these pro
 - `typescript` — TypeScript-aware profile.
 - `rust` — Rust-aware profile.
 
-Profile declarations are part of the installer contract. A profile is not considered release-ready merely because it appears in the manifest; its templates, pinned runtime dependencies, tests, and repository validation must also be complete.
+The `generic`, `typescript`, and `rust` profiles now have concrete templates and pinned runtime contracts. TypeScript uses TypeScript 5.9.3 with TypeScript Language Server 5.1.3; Rust uses toolchain 1.85.0 with `rust-analyzer` from the pinned Rust image. Profile readiness is enforced by repository validation and installer tests.
+
+For installation and lifecycle commands, see [Using the Codex AI Tooling installer](./ai-tools/codex-ai-tooling-installer.md).
 
 ## Lifecycle operations
 

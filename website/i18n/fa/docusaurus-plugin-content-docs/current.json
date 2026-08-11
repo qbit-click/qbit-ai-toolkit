@@ -31,6 +31,10 @@
     "message": "CodexPro",
     "description": "The label for category 'CodexPro' in sidebar 'aiTools'"
   },
+  "sidebar.aiTools.category.Codex AI Tooling installer": {
+    "message": "Installer ابزارهای Codex AI",
+    "description": "The label for category 'Codex AI Tooling installer' in sidebar 'aiTools'"
+  },
   "sidebar.aiTools.category.Setup & reusable assets": {
     "message": "راه‌اندازی و دارایی‌های قابل استفاده مجدد",
     "description": "The label for category 'Setup & reusable assets' in sidebar 'aiTools'"
