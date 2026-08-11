@@ -109,7 +109,7 @@ const config: Config = {
           ],
         },
       ],
-      copyright: `Copyright © ${new Date().getFullYear()} Qbit.`,
+      copyright: `Copyright © ${new Date().getFullYear()} <a href="https://futech-co.ir" target="_blank" rel="noopener noreferrer">Futech LLC</a>.`,
     },
     prism: {
       theme: prismThemes.github,
