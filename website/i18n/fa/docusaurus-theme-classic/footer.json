@@ -56,7 +56,7 @@
     "description": "The label of footer link with label=Qbit linking to https://qbit.click"
   },
   "copyright": {
-    "message": "© 2026 Qbit. همه حقوق محفوظ است.",
+    "message": "Copyright © 2026 <a href=\"https://futech-co.ir\" target=\"_blank\" rel=\"noopener noreferrer\">Futech LLC</a>.",
     "description": "The footer copyright"
   }
 }
