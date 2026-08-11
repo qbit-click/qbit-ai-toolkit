@@ -15,6 +15,7 @@ This section covers operational tooling that helps prepare, run, verify, or main
 - reusable configuration and template assets;
 - [repository-owned AI tooling implementation](./repository-owned-ai-tooling.md) architecture, lifecycle, security, and validation guidance;
 - [CodexPro](./codexpro/index.md) setup and operational guidance;
+- [ChatGPT Web for Codex](./codex-chatgpt-web.md): use ChatGPT Web models, including account-available Pro, inside the native Codex workflow;
 - the Codex AI Tooling installer and repository-local AI tooling;
 - operational guidance for installing, updating, repairing, and troubleshooting tooling.
 

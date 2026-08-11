@@ -15,6 +15,7 @@ sidebar_label: معرفی
 - configuration و templateهای قابل استفاده مجدد؛
 - راهنمای [پیاده‌سازی AI Tooling تحت مالکیت Repository](./repository-owned-ai-tooling.md) شامل معماری، lifecycle، امنیت و validation؛
 - راه‌اندازی و راهنمای عملیاتی [CodexPro](./codexpro/index.md)؛
+- راهنمای [استفاده از مدل‌های وب ChatGPT در Codex](./codex-chatgpt-web.md)، از جمله استفاده از Pro در صورت دسترسی حساب؛
 - Codex AI Tooling و ابزارهای AI محلی repository؛
 - راهنمای install، update، repair و troubleshooting ابزارها.
 
