@@ -69,6 +69,7 @@ const sidebars: SidebarsConfig = {
       collapsed: false,
       items: ['ai-tools/codexpro/index', 'ai-tools/codexpro/windows-setup'],
     },
+    'ai-tools/codex-chatgpt-web',
     {
       type: 'category',
       label: 'Codex AI Tooling installer',
