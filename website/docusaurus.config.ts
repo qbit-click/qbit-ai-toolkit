@@ -65,7 +65,7 @@ const config: Config = {
         src: 'img/qbit-ai-toolkit-logo.svg',
       },
       items: [
-        {to: '/', label: 'Start', position: 'left'},
+        {to: '/', label: 'Start', position: 'left', activeBaseRegex: '^/(fa/)?$'},
         {type: 'docSidebar', sidebarId: 'promptEngineering', label: 'Prompt Engineering', position: 'left'},
         {type: 'docSidebar', sidebarId: 'aiTools', label: 'AI Tools', position: 'left'},
         {type: 'docSidebar', sidebarId: 'mcp', label: 'MCP', position: 'left'},
