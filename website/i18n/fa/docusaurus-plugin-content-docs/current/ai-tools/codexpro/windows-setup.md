@@ -1,137 +1,185 @@
 ---
 id: windows-setup
-title: راه‌اندازی Canonical CodexPro روی Windows
+title: راه‌اندازی CodexPro روی Windows
 sidebar_label: راه‌اندازی Windows
 ---
 
-# راه‌اندازی Canonical CodexPro روی Windows
+# راه‌اندازی CodexPro روی Windows
 
-> **وضعیت مرجع:** این راهنما بر اساس configuration ثبت‌شده در `2026-08-10` است و patchهای آن مشخصاً برای **CodexPro `0.29.0`** نوشته شده‌اند. برای patch blockهای exact و فایل‌هایی که SHA-256 مرجع دارند، از [نسخه canonical انگلیسی](https://ai-toolkit.qbit.click/ai-tools/codexpro/windows-setup) استفاده کنید و متن کد را ترجمه یا بازنویسی نکنید.
+این راهنما یک **setup عمومی و قابل استفاده مجدد** را مستند می‌کند، نه snapshot یک سیستم شخصی، پروژه خاص، hostname واقعی، tunnel واقعی، account خاص یا layout وابسته به یک package manager مشخص.
 
-این setup باید معماری مرجع AminPC را بازسازی کند:
+در مثال‌ها از placeholderهایی مثل `<PUBLIC_HOSTNAME>` و `<WORKSPACE_PATH>` استفاده شده است. این مقادیر را با configuration محیط خودتان جایگزین کنید. username، tunnel ID، connector name، package path یا credential یک deployment دیگر را کپی نکنید.
+
+## معماری هدف
+
+یک مسیر معمول remote-to-local به این شکل است:
 
 ```text
 ChatGPT
   |
-  | MCP connector: AminPC
+  | MCP connector
   v
 https://<PUBLIC_HOSTNAME>/mcp
   |
-  | Cloudflare named tunnel
+  | secure named tunnel
   v
 http://127.0.0.1:8787/mcp
   |
   v
-CodexPro 0.29.0
+CodexPro
   |
-  +-- workspace tools
-  +-- bash -> codex sandbox -P :workspace -> Git Bash
-  +-- host_exec / open_app -> direct Windows-user execution
+  +-- repository/workspace tools
+  +-- bash -> Codex workspace sandbox -> Git Bash
+  +-- optional host execution extension
 ```
 
-## رفتار مرجع
+مرزهای اعتماد مهم:
 
-- MCP فقط روی `127.0.0.1:8787` گوش می‌دهد.
-- دسترسی عمومی از Cloudflare named tunnel با hostname پایدار انجام می‌شود.
-- HTTP MCP authentication فعال است.
-- نام connector در ChatGPT برابر `AminPC` است.
-- CodexPro در mode `Agent` با `tool-mode=full`، `write=workspace` و `bash=full` اجرا می‌شود.
-- Bash با وجود policy کامل، داخل Codex workspace sandbox باقی می‌ماند.
-- `cwd=..` نباید بتواند از workspace root خارج شود.
-- `CODEXPRO_INHERIT_ENV` فعال نمی‌شود.
-- محیط محدود Windows فقط `USERPROFILE` و `TEMP` را به مجموعه ضروری اضافه می‌کند.
-- `host_exec` و `open_app` خارج از sandbox و با Windows user فعلی اجرا می‌شوند.
-- launcher مرجع host execution را به‌صورت پیش‌فرض روی `full-access` قرار می‌دهد.
-- `full-access` محدودیت UAC یا Administrator ویندوز را دور نمی‌زند.
+- MCP listener فقط روی loopback باشد؛
+- public endpoint از یک secure tunnel ارائه شود؛
+- MCP authentication فعال باشد؛
+- Bash داخل workspace انتخاب‌شده محدود بماند؛
+- اجرای مستقیم روی Windows host، اگر فعال شود، یک capability جدا و privileged است.
 
-## نسخه‌های مرجع
+## سیاست نسخه
 
-| Component | Version |
-|---|---:|
-| Windows | Windows 11 |
-| PowerShell | 7.6.4 |
-| Bun | 1.3.14 |
-| CodexPro | **0.29.0** |
-| Codex CLI | 0.146.1 |
-| Git for Windows | 2.55.0.windows.3 |
-| cloudflared | 2026.7.3 |
+setup تاریخی Qbit برای customizationهای version-specific روی **CodexPro `0.29.0`** validate شده بود. هر source patch یا extension محلی باید وابسته به همان build دقیقی در نظر گرفته شود که برای آن نوشته شده است.
 
-برای بازسازی byte-for-byte، CodexPro را روی `0.29.0` pin کنید. patch anchorهای این راهنما برای version دیگری معتبر فرض نمی‌شوند.
+برای stock installation، version موردنیاز محیط خودتان را نصب کنید و CLI flagهای همان build را verify کنید. patch مربوط به `0.29.0` را برای version دیگر معتبر فرض نکنید.
 
-## مقادیر deployment مرجع
-
-| Item | مقدار مرجع |
-|---|---|
-| Windows user | `aminn` |
-| Workspace عمومی PC | `C:\Users\aminn` |
-| CodexPro state | `C:\Users\aminn\.codexpro` |
-| Package | `C:\Users\aminn\.bun\install\global\node_modules\codexpro` |
-| Git Bash | `C:\Program Files\Git\bin` |
-| Local MCP | `http://127.0.0.1:8787/mcp` |
-| Public hostname | `codexpro.futech-co.ir` |
-| Tunnel name | `codexpro-local` |
-| Connector | `AminPC` |
-| Host mode | `full-access` |
-
-روی ماشین دیگر hostname، tunnel name، token و user-specific pathها را تغییر دهید. tunnel ID را Cloudflare تولید می‌کند و نباید داخل launcher hardcode شود.
-
-## مرز امنیتی
-
-### Bash
-
-```text
-ChatGPT -> CodexPro bash -> codex sandbox -P :workspace -> Git Bash
-```
-
-`bashMode=full` به معنی خروج از sandbox نیست.
-
-### Host execution
-
-```text
-ChatGPT -> CodexPro host_exec/open_app -> direct Windows spawn
-```
-
-Host execution:
-
-- executable absolute می‌خواهد؛
-- argv مستقیم می‌گیرد و shell command string ندارد؛
-- `shell: false` است؛
-- environment variableهای secret-like را filter می‌کند؛
-- سه mode `off`، `on-request` و `full-access` دارد.
-
-در `full-access` داشتن connector/token معتبر می‌تواند به اجرای مستقیم process با Windows user فعلی منجر شود. token و URL حاوی token باید secret در نظر گرفته شوند.
-
-## پیش‌نیازها
-
-نصب و بررسی کنید:
-
-1. PowerShell 7
-2. Bun
-3. Git for Windows همراه Git Bash
-4. Codex CLI با authentication معتبر
-5. Cloudflare account با کنترل hostname مقصد
+Versionهای واقعی deployment را ثبت کنید:
 
 ```powershell
 pwsh --version
-bun --version
 git --version
 codex --version
-```
-
-## نصب CodexPro pin‌شده
-
-```powershell
-bun add -g codexpro@0.29.0
 codexpro --version
+cloudflared --version
 ```
 
-خروجی مورد انتظار:
+## مقادیر deployment
+
+به‌جای hardcode کردن مقادیر شخصی از configuration استفاده کنید:
+
+| Item | فرم پیشنهادی |
+|---|---|
+| Windows home | `$HOME` |
+| Workspace root | `<WORKSPACE_PATH>` |
+| CodexPro state | `$HOME\.codexpro` |
+| CodexPro package directory | `<CODEXPRO_PACKAGE_DIR>` |
+| Git Bash | discovery با `Get-Command` یا configuration صریح |
+| Local MCP | `http://127.0.0.1:8787/mcp` |
+| Public hostname | `<PUBLIC_HOSTNAME>` |
+| Tunnel name | `<TUNNEL_NAME>` |
+| ChatGPT connector name | `<CONNECTOR_NAME>` |
+| Host execution mode | `off`، `on-request` یا `full-access` |
+
+Launcher قابل استفاده مجدد باید این موارد را از parameter/configuration بگیرد و هیچ username، machine name، project name، DNS واقعی، tunnel ID یا global package path شخصی را داخل source نگذارد.
+
+## مرز امنیتی
+
+### Bash sandboxed
 
 ```text
-0.29.0
+ChatGPT -> CodexPro bash -> Codex workspace sandbox -> Git Bash
 ```
 
+حتی policy permissive برای Bash نباید به معنی دسترسی خارج از workspace باشد. containment را با سناریوهایی مثل `cwd=..` صریحاً تست کنید.
+
+برای Windows sandbox، environment inheritance را محدود نگه دارید. برای حل یک متغیر missing کل host environment را inherit نکنید.
+
+### اجرای مستقیم روی host
+
+```text
+ChatGPT -> CodexPro host execution -> direct Windows process
+```
+
+اگر build یا extension محلی شما capabilityهایی مثل `host_exec` یا `open_app` ارائه می‌دهد، آن‌ها را privileged در نظر بگیرید:
+
+- executable باید absolute باشد؛
+- argv مستقیم پاس داده شود و shell command string ساخته نشود؛
+- `shell: false` حفظ شود؛
+- environment variableهای secret-like filter شوند؛
+- default پیشنهادی `on-request` است مگر unattended direct execution یک requirement صریح باشد؛
+- `full-access` محدودیت UAC یا Administrator را دور نمی‌زند.
+
+MCP URL حاوی token، مخصوصاً در حالت direct host execution، secret محسوب می‌شود.
+
+## پیش‌نیازها
+
+نصب و verify کنید:
+
+1. PowerShell 7؛
+2. یک package manager که بتواند package npm با نام `codexpro` را نصب کند؛
+3. Git for Windows همراه Git Bash؛
+4. Codex CLI با authentication معتبر؛
+5. `cloudflared` در صورت استفاده از Cloudflare named tunnel؛
+6. کنترل public hostname مورد استفاده connector.
+
+### انتخاب package manager
+
+**Bun اجباری نیست.** CodexPro می‌تواند با package manager انتخابی محیط نصب شود. contract مهم این است که version موردنظر نصب شود و executable `codexpro` روی `PATH` در دسترس باشد.
+
+مثال برای CodexPro `0.29.0`:
+
+```powershell
+# npm
+npm install -g codexpro@0.29.0
+
+# pnpm
+pnpm add -g codexpro@0.29.0
+
+# Bun
+bun add -g codexpro@0.29.0
+
+# Yarn Classic
+# yarn global add codexpro@0.29.0
+```
+
+Syntax نصب global در نسل‌های مختلف Yarn متفاوت است؛ از روش پشتیبانی‌شده توسط version Yarn محیط خود استفاده کنید.
+
+نتیجه را مستقل از package manager verify کنید:
+
+```powershell
+codexpro --version
+Get-Command codexpro
+```
+
+## فقط در صورت نیاز package directory را resolve کنید
+
+برای استفاده عادی از CLI، `codexpro` روی `PATH` کافی است. package directory فقط برای inspection یا patch workflow version-specific لازم می‌شود.
+
+مسیر وابسته به Bun را universal فرض نکنید. مسیر را صریح resolve/configure کنید:
+
+```powershell
+$CodexProPackageDir = '<CODEXPRO_PACKAGE_DIR>'
+$PackageJson = Join-Path $CodexProPackageDir 'package.json'
+
+if (-not (Test-Path -LiteralPath $PackageJson -PathType Leaf)) {
+    throw "CodexPro package.json not found: $PackageJson"
+}
+
+$Package = Get-Content -LiteralPath $PackageJson -Raw | ConvertFrom-Json
+if ($Package.name -ne 'codexpro') {
+    throw "Unexpected package at $CodexProPackageDir"
+}
+```
+
+Helperهای رایج:
+
+```powershell
+# npm
+$NpmRoot = npm root -g
+
+# pnpm
+$PnpmRoot = pnpm root -g
+```
+
+Package managerهای دیگر ممکن است global store یا shim layout متفاوت داشته باشند. Launcher عمومی باید resolved package directory را از config بگیرد، نه اینکه آن را از username یا package manager حدس بزند.
+
 ## ساخت state directory
+
+از home user جاری استفاده کنید:
 
 ```powershell
 $CodexProDir = Join-Path $HOME '.codexpro'
@@ -140,21 +188,21 @@ New-Item -ItemType Directory -Path (Join-Path $CodexProDir 'backups') -Force | O
 New-Item -ItemType Directory -Path (Join-Path $CodexProDir 'bin') -Force | Out-Null
 ```
 
-ساختار اصلی:
+ساختار پیشنهادی:
 
 ```text
 ~\.codexpro\
 ├── backups\
 ├── bin\
-│   └── cloudflared.exe
 ├── http-token
-├── Install-CodexProWorkspaceSandbox.ps1
 └── Start-CodexPro.ps1
 ```
 
+این directory را commit نکنید و به‌عنوان deployment template بین userها کپی نکنید.
+
 ## ساخت HTTP MCP token
 
-Token باید برای هر installation جدید دوباره تولید شود و هرگز commit نشود.
+برای هر deployment یک token جدید تولید کنید:
 
 ```powershell
 $TokenFile = Join-Path $HOME '.codexpro\http-token'
@@ -172,290 +220,322 @@ if ($Token.Length -ne 64 -or $Token -notmatch '^[0-9a-f]{64}$') {
 }
 ```
 
-Token را در log چاپ نکنید.
+Token را در logهای عادی چاپ نکنید و داخل repository قرار ندهید.
 
-## نصب و راه‌اندازی Cloudflare tunnel
+## راه‌اندازی Cloudflare named tunnel
 
-Binary مرجع:
-
-```text
-$HOME\.codexpro\bin\cloudflared.exe
-```
-
-راه‌اندازی یک‌باره:
+در این مثال Cloudflare استفاده می‌شود. همه مقادیر deployment-specific را خودتان تعیین کنید:
 
 ```powershell
-$Cloudflared = "$HOME\.codexpro\bin\cloudflared.exe"
-$TunnelName = 'codexpro-local'
-$Hostname   = 'codexpro.futech-co.ir'
+$TunnelName = '<TUNNEL_NAME>'
+$Hostname = '<PUBLIC_HOSTNAME>'
 
-& $Cloudflared tunnel login
-& $Cloudflared tunnel create $TunnelName
-& $Cloudflared tunnel route dns $TunnelName $Hostname
-& $Cloudflared tunnel list
+cloudflared tunnel login
+cloudflared tunnel create $TunnelName
+cloudflared tunnel route dns $TunnelName $Hostname
+cloudflared tunnel list
 ```
 
-Launcher از **tunnel name** استفاده می‌کند، نه tunnel ID.
+Tunnel ID را Cloudflare تولید می‌کند. ID متعلق به deployment دیگر را داخل launcher عمومی hardcode نکنید.
 
-## Patchهای Canonical
+## تنظیم Git Bash
 
-Stock package برای دو نیاز patch می‌شود:
+به‌جای مسیر user-specific، discovery انجام دهید:
 
-1. **Windows Bash/Codex sandbox** — اجرای Git Bash از مسیر `codex sandbox -P :workspace` با environment محدود که `USERPROFILE` و `TEMP` را هم دارد.
-2. **Host access** — اضافه شدن `host_exec` و `open_app` برای عملیات خارج از Codex sandbox.
+```powershell
+$GitBashCandidates = @(
+    'C:\Program Files\Git\bin\bash.exe',
+    'C:\Program Files\Git\usr\bin\bash.exe'
+)
 
-سه artifact اصلی وجود دارند:
+$GitBash = $GitBashCandidates |
+    Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } |
+    Select-Object -First 1
 
-- `~\.codexpro\Install-CodexProWorkspaceSandbox.ps1`
-- `dist\hostOps.js`
-- `~\.codexpro\Start-CodexPro.ps1`
+if (-not $GitBash) {
+    throw 'Git Bash was not found. Configure its path explicitly.'
+}
+```
 
-همچنین `dist\config.js` و `dist\server.js` با anchorهای مشخص patch می‌شوند.
+اگر Git در مسیر دیگری نصب شده، همان location را configure کنید.
 
-**برای این قسمت از [نسخه canonical انگلیسی](https://ai-toolkit.qbit.click/ai-tools/codexpro/windows-setup#part-ii--canonical-custom-patches) استفاده کنید.** فایل‌های verbatim و hashها نباید در ترجمه دوباره تایپ شوند.
+## customizationهای version-specific روی Windows
 
-Hashهای مرجع:
+بعضی deploymentها برای یک build مشخص CodexPro، Windows Bash sandbox path را تغییر می‌دهند یا capabilityهایی مثل `host_exec` و `open_app` اضافه می‌کنند.
 
-| File | SHA-256 |
-|---|---|
-| `Install-CodexProWorkspaceSandbox.ps1` | `97C3BADBA08818BF9CA92BB56158542092F128710A5953664DB3334D13CBF38F` |
-| `Start-CodexPro.ps1` | `34E495DCA2E3147633C191E95FD997EE8E211959D46EFA1DAB3A7DA2ED89A0DB` |
-| `bashOps.js` | `3EB700D4C37A6B7470D29C9B2DC486D39DC69D7B9617154C244362381C2039AF` |
-| `config.js` | `28A70D25251954159E6028090845ABA518C49515B0778894D63CBF68E74058BD` |
-| `server.js` | `6549371A044C58C45EE02FE2508D0CBD4D6A80E8E2F95BD3AAFD060FAD1B67BD` |
-| `hostOps.js` | `E95D7A02D55C2A0DD7CF9427B030C95D15B0E794A6F92E2A9B764C7C265E005F` |
+این customizationها **deployment value عمومی نیستند**. آن‌ها را به‌عنوان patch asset versioned مدیریت کنید:
 
-## تابع `cpx`
+1. build دقیق CodexPro را pin کنید؛
+2. `<CODEXPRO_PACKAGE_DIR>` را صریح پاس دهید؛
+3. username، home path، project path، hostname، tunnel ID و connector name را داخل patch source قرار ندهید؛
+4. anchorهای ساختاری exact باشند و در صورت missing/duplicate بودن fail شود؛
+5. قبل از mutation backup بگیرید؛
+6. فایل‌های نهایی را قبل از startup validate کنید؛
+7. hash را از همان patch versionی که deploy می‌کنید تولید کنید، نه از یک ماشین دیگر؛
+8. بعد از هر update، patch را دوباره review و test کنید.
 
-در PowerShell 7 profile تابع `cpx` launcher را با workspace دلخواه اجرا می‌کند:
+اگر stock CodexPro capability لازم را ارائه می‌کند، stock implementation را به local patch ترجیح دهید.
+
+## Launcher قابل استفاده مجدد
+
+Launcher باید مقادیر deployment را parameter بگیرد. مثال زیر هیچ path یا hostname شخصی ندارد:
+
+```powershell
+[CmdletBinding()]
+param(
+    [Parameter(Position = 0)]
+    [string]$Root = (Get-Location).Path,
+
+    [Parameter(Mandatory)]
+    [string]$Hostname,
+
+    [Parameter(Mandatory)]
+    [string]$TunnelName,
+
+    [ValidateSet('off', 'on-request', 'full-access')]
+    [string]$HostExecMode = 'on-request'
+)
+
+$ErrorActionPreference = 'Stop'
+
+if (-not (Test-Path -LiteralPath $Root -PathType Container)) {
+    throw "Workspace does not exist: $Root"
+}
+
+$TokenFile = Join-Path $HOME '.codexpro\http-token'
+if (-not (Test-Path -LiteralPath $TokenFile -PathType Leaf)) {
+    throw "CodexPro token file not found: $TokenFile"
+}
+
+$GitBashCandidates = @(
+    'C:\Program Files\Git\bin\bash.exe',
+    'C:\Program Files\Git\usr\bin\bash.exe'
+)
+$GitBash = $GitBashCandidates |
+    Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } |
+    Select-Object -First 1
+if (-not $GitBash) {
+    throw 'Git Bash was not found.'
+}
+
+$ResolvedRoot = (Resolve-Path -LiteralPath $Root).Path
+$McpToken = [IO.File]::ReadAllText($TokenFile).Trim()
+if ([string]::IsNullOrWhiteSpace($McpToken) -or $McpToken -match '\s') {
+    throw 'CodexPro token is empty or invalid.'
+}
+
+$PreviousBashSandbox = $env:CODEXPRO_BASH_SANDBOX
+$PreviousBashExecutable = $env:CODEXPRO_BASH_EXECUTABLE
+$PreviousHostExecMode = $env:CODEXPRO_HOST_EXEC_MODE
+
+$env:CODEXPRO_BASH_SANDBOX = 'workspace'
+$env:CODEXPRO_BASH_EXECUTABLE = $GitBash
+$env:CODEXPRO_HOST_EXEC_MODE = $HostExecMode
+
+$CodexProArgs = @(
+    'stable',
+    '--root', $ResolvedRoot,
+    '--hostname', $Hostname,
+    '--tunnel-name', $TunnelName,
+    '--token', $McpToken,
+    '--agent',
+    '--tool-mode', 'full',
+    '--write', 'workspace',
+    '--bash', 'full'
+)
+
+try {
+    & codexpro @CodexProArgs
+}
+finally {
+    $env:CODEXPRO_BASH_SANDBOX = $PreviousBashSandbox
+    $env:CODEXPRO_BASH_EXECUTABLE = $PreviousBashExecutable
+    $env:CODEXPRO_HOST_EXEC_MODE = $PreviousHostExecMode
+}
+```
+
+آن را مثلاً در مسیر زیر ذخیره کنید:
+
+```text
+~\.codexpro\Start-CodexPro.ps1
+```
+
+چون workspace، hostname، tunnel name و host mode در runtime داده می‌شوند، launcher به یک machine خاص وابسته نمی‌شود.
+
+## Helper اختیاری `cpx`
+
+می‌توانید PowerShell helper زیر را به profile خود اضافه کنید:
 
 ```powershell
 function cpx {
     [CmdletBinding()]
     param(
         [Parameter(Position = 0)]
-        [string]$Root = (Get-Location).Path
+        [string]$Root = (Get-Location).Path,
+
+        [Parameter(Mandatory)]
+        [string]$Hostname,
+
+        [Parameter(Mandatory)]
+        [string]$TunnelName
     )
 
-    $Launcher = Join-Path (Join-Path $HOME '.codexpro') 'Start-CodexPro.ps1'
-    & $Launcher -Root $Root
+    $Launcher = Join-Path $HOME '.codexpro\Start-CodexPro.ps1'
+    & $Launcher -Root $Root -Hostname $Hostname -TunnelName $TunnelName
 }
 ```
 
-استفاده:
+مثال عمومی:
 
 ```powershell
-cpx
-cpx C:\Users\aminn
+cpx -Root 'D:\Projects\ExampleProject' -Hostname 'codexpro.example.com' -TunnelName 'codexpro-local'
 ```
 
-برای host mode متفاوت، launcher را مستقیم صدا بزنید:
+برای کار روزمره، narrowest practical repository root را انتخاب کنید و کل user profile را expose نکنید.
 
-```powershell
-& "$HOME\.codexpro\Start-CodexPro.ps1" -Root C:\Users\aminn -HostExecMode on-request
-```
+## اتصال ChatGPT
 
-## شروع server و اتصال ChatGPT
-
-برای workspace عمومی PC:
-
-```powershell
-cpx C:\Users\aminn
-```
-
-برای پروژه مشخص، root محدودتر بهتر است:
-
-```powershell
-cpx D:\Projects\ExampleProject
-```
-
-Local MCP باید گزارش کند:
-
-```text
-HTTP MCP listening on http://127.0.0.1:8787/mcp
-```
-
-Connector در ChatGPT:
+بعد از healthy شدن server و tunnel، MCP connector را با مقادیر deployment خودتان بسازید:
 
 | Field | مقدار |
 |---|---|
-| Name | `AminPC` |
-| Server URL | URL exact که CodexPro در runtime تولید می‌کند |
-| Authentication | `None` |
+| Name | `<CONNECTOR_NAME>` |
+| Server URL | exact URL تولیدشده توسط CodexPro runtime |
+| Authentication | mode موردنیاز endpoint |
 | Permissions | فقط actionهای لازم workflow |
 
-URL تولیدشده token را داخل خود دارد و باید secret تلقی شود.
+Connector name یک deployment choice است و نباید اسم شخص یا یک سیستم خصوصی به‌عنوان مقدار canonical در مستندات عمومی ثبت شود.
+
+اگر URL شامل authentication material است، کل URL را secret در نظر بگیرید.
 
 ## Verification
 
-### `server_config`
+### 1. Local health
 
-مقادیر مهم مرجع:
-
-```text
-host                 = 127.0.0.1
-port                 = 8787
-authEnabled          = true
-bashMode             = full
-bashTranscript       = compact
-hostExecMode         = full-access
-writeMode            = workspace
-toolMode             = full
-inheritEnv           = false
-registeredToolCount  = 28
-```
-
-Toolهای custom مورد انتظار:
-
-```text
-host_exec
-open_app
-```
-
-### Workspace containment
-
-با root برابر:
-
-```text
-C:\Users\aminn
-```
-
-درخواست با:
-
-```text
-cwd = ..
-```
-
-باید با خطایی معادل زیر رد شود:
-
-```text
-Path escapes workspace root: ..
-```
-
-### Sandbox Bash
-
-`pwd` در workspace مرجع باید به:
-
-```text
-/c/Users/aminn
-```
-
-resolve شود و Bash از `codex sandbox -P :workspace` عبور کند.
-
-### Restricted environment
-
-Sandbox باید `USERPROFILE` و `TEMP` داشته باشد و به `CODEXPRO_INHERIT_ENV=1` نیاز نداشته باشد.
-
-### Full Access host execution
-
-`host_exec` را با executable زیر تست کنید:
-
-```text
-C:\Windows\System32\whoami.exe
-```
-
-انتظار:
-
-- execution موفق؛
-- user واقعی Windows در خروجی؛
-- `approval=full-access`؛
-- بدون popup approval در mode پیش‌فرض.
-
-سپس `open_app` را با یک GUI harmless تست کنید.
-
-### Cloudflare tunnel
-
-Endpoint محلی:
+قبل از public tunnel، endpoint محلی را تست کنید:
 
 ```text
 http://127.0.0.1:8787/healthz
 ```
 
-باید HTTP 200 بدهد. اگر QUIC در دسترس نیست، HTTP/2 tunnel معتبر است و failure صرف QUIC blocker نیست.
+### 2. Configuration
 
-## Update policy
+با diagnostic/config resource خود CodexPro مقادیر effective زیر را بررسی کنید:
 
-CodexPro را blind update نکنید. این setup فایل‌های package را زیر مسیر زیر تغییر می‌دهد:
+- host و port؛
+- authentication؛
+- workspace root؛
+- Bash mode؛
+- write mode؛
+- tool mode؛
+- environment inheritance؛
+- host-execution mode در صورت نصب extension.
+
+Tool count ثابت متعلق به deployment دیگری را acceptance criterion قرار ندهید؛ inventory ممکن است با version و capability set تغییر کند.
+
+### 3. Workspace containment
+
+یک test repository را به‌عنوان `<WORKSPACE_PATH>` باز کنید و مطمئن شوید `cwd=..` نمی‌تواند از root خارج شود.
+
+### 4. Bash path
+
+یک command harmless مثل `pwd` اجرا کنید و verify کنید به workspace انتخاب‌شده resolve می‌شود.
+
+### 5. Host execution
+
+فقط اگر extension مربوط به host execution را آگاهانه فعال کرده‌اید، با یک executable harmless و absolute تست کنید:
 
 ```text
-~\.bun\install\global\node_modules\codexpro\dist
+C:\Windows\System32\whoami.exe
 ```
+
+Approval behavior باید مطابق mode انتخاب‌شده باشد.
+
+### 6. Public tunnel
+
+بررسی کنید hostname عمومی به endpoint محلی route شود و request بدون authentication نتواند MCP access بگیرد.
+
+### 7. End-to-end connector
+
+روی یک disposable test repository یک loop حداقلی read → controlled edit/write → verification را انجام دهید. اولین E2E test را روی production repository اجرا نکنید.
+
+## سیاست Update
+
+Installation patch‌شده version-specific را blind update نکنید.
 
 قبل از update:
 
-1. version فعلی را ثبت کنید؛
-2. `~\.codexpro` را backup کنید؛
-3. فایل‌های patched `dist` را backup کنید؛
-4. version جدید را نصب کنید؛
-5. implementation آن را با patch anchorهای runbook مقایسه کنید؛
-6. patchها را برای build جدید دوباره validate کنید؛
-7. کل acceptance testها را اجرا کنید؛
-8. فقط بعد از موفقیت connector production را جابه‌جا کنید.
+1. version فعلی CodexPro را ثبت کنید؛
+2. local state لازم برای recovery را backup کنید و secret را وارد source control نکنید؛
+3. package fileهای تغییرکرده توسط extension را backup کنید؛
+4. version جدید را با package manager انتخابی نصب کنید؛
+5. اگر package layout تغییر کرده، package directory را دوباره resolve کنید؛
+6. implementation جدید را با assumptionهای patch مقایسه کنید؛
+7. patch را فقط بعد از review دوباره اعمال یا retire کنید؛
+8. acceptance test کامل را اجرا کنید؛
+9. production connector را فقط بعد از pass شدن validation منتقل کنید.
 
-برای rebuild deterministic اضطراری:
+Package manager می‌تواند مستقل از CodexPro تغییر کند. Storage layout package manager نباید بخشی از معماری CodexPro فرض شود.
+
+## Troubleshooting
+
+### `codexpro` پیدا نمی‌شود
+
+Global binary/shim directory package manager را بررسی کنید:
 
 ```powershell
-bun add -g codexpro@0.29.0
+Get-Command codexpro -ErrorAction SilentlyContinue
 ```
 
-## Workspace policy
+### Patch script مسیر `dist` را پیدا نمی‌کند
 
-Connector عمومی مرجع root بزرگی مانند `C:\Users\aminn` دارد، اما برای project work بهتر است root محدودتر باز شود:
+`<CODEXPRO_PACKAGE_DIR>` اشتباه است یا package layout تغییر کرده. مسیر واقعی package manager فعلی را resolve کنید و به hardcoded Bun path fallback نکنید.
 
-```powershell
-cpx D:\Projects\MyProject
-```
+### Bash اجرا نمی‌شود
 
-از recursive scan کل user profile تا حد امکان پرهیز کنید؛ folderهای phone/cloud-backed می‌توانند download جانبی trigger کنند.
+Git Bash را مستقل verify کنید و سپس `CODEXPRO_BASH_EXECUTABLE` را بررسی کنید.
 
-## خلاصه مدل امنیتی
+### Workspace escape موفق می‌شود
 
-```text
-Bash:
-  full command policy
-  + Codex workspace sandbox
-  + restricted environment
+این یک security failure است. Remote connector را تا زمان اصلاح containment متوقف کنید.
 
-Host execution:
-  direct executable + argv
-  shell: false
-  filtered environment
-  default full-access
-  no UAC bypass
+### Tunnel محلی کار می‌کند ولی public endpoint نه
 
-Remote exposure:
-  localhost MCP
-  + bearer token
-  + Cloudflare named tunnel
-```
+DNS، named tunnel، hostname ownership و authentication را جداگانه بررسی کنید. برای debug tunnel، MCP authentication را ضعیف نکنید.
 
-حساس‌ترین artifact در mode `full-access` همان MCP token و connector URL حاوی token است.
+### Host execution بیش از حد permissive است
+
+Mode را به `on-request` یا `off` تغییر دهید و server را restart کنید.
 
 ## Acceptance checklist
 
-- [ ] `codexpro --version` برابر `0.29.0` است.
-- [ ] named tunnel hostname صحیح را resolve می‌کند.
-- [ ] `/healthz` محلی HTTP 200 می‌دهد.
-- [ ] MCP token وجود دارد و commit نشده است.
-- [ ] sandbox installer idempotent است.
-- [ ] فایل‌های verbatim با hashهای مرجع match هستند.
-- [ ] `server_config` مقادیر `toolMode=full`، `writeMode=workspace`، `bashMode=full` و `hostExecMode=full-access` را گزارش می‌کند.
-- [ ] `inheritEnv=false` است.
-- [ ] 28 tool در full mode ثبت شده‌اند.
-- [ ] `host_exec` و `open_app` وجود دارند.
-- [ ] `cwd=..` توسط workspace boundary رد می‌شود.
-- [ ] `pwd` به workspace انتخاب‌شده resolve می‌شود.
-- [ ] sandbox بدون full host environment inheritance کار می‌کند.
-- [ ] `USERPROFILE` و `TEMP` در sandbox Windows موجودند.
-- [ ] `whoami.exe` از `host_exec` بدون approval popup در full-access موفق است.
-- [ ] یک GUI harmless با `open_app` اجرا می‌شود.
-- [ ] connector `AminPC` یک loop کامل read → edit/write → verification را انجام می‌دهد.
-- [ ] هیچ token یا token-bearing URL در repository ذخیره نشده است.
+- [ ] Version موردنظر CodexPro نصب و ثبت شده است.
+- [ ] `codexpro` مستقل از package manager روی `PATH` resolve می‌شود.
+- [ ] هیچ username، machine name، project name، hostname واقعی، tunnel ID یا package-manager-specific global path داخل reusable script وجود ندارد.
+- [ ] MCP listener روی loopback bind شده است.
+- [ ] Public tunnel hostname صحیح resolve می‌شود.
+- [ ] MCP authentication فعال است و secret commit نشده است.
+- [ ] Workspace root صریح است.
+- [ ] `cwd=..` نمی‌تواند از workspace خارج شود.
+- [ ] Git Bash داخل workspace sandbox اجرا می‌شود.
+- [ ] broad host environment inheritance بدون review فعال نشده است.
+- [ ] Optional host execution approval mode صحیح دارد.
+- [ ] E2E روی disposable test repository پاس می‌شود.
+- [ ] Patchهای version-specific، در صورت وجود، برای exact build فعلی تولید و validate شده‌اند.
 
-## اجرای نهایی canonical
+## قانون عملیاتی پیشنهادی
 
-```powershell
-cpx C:\Users\aminn
+مستند عمومی باید **contract و placeholder** را توصیف کند، نه machine یک توسعه‌دهنده را. این موارد نباید در canonical docs قرار بگیرند:
+
+```text
+Windows username واقعی
+home-directory path واقعی
+نام پروژه یا مشتری واقعی
+connector name شخصی
+public hostname خصوصی
+Cloudflare tunnel ID واقعی
+authentication token
+مسیر global یک package manager خاص به‌عنوان مسیر universal
 ```
 
-برای exact patch source، line-ending notes و forensic hash guidance به [نسخه canonical انگلیسی](https://ai-toolkit.qbit.click/ai-tools/codexpro/windows-setup) مراجعه کنید.
+این تفکیک باعث می‌شود راهنمای CodexPro بین سیستم‌ها، تیم‌ها، package managerها و repositoryهای مختلف قابل استفاده مجدد باشد.

@@ -67,7 +67,12 @@ const sidebars: SidebarsConfig = {
       type: 'category',
       label: 'CodexPro',
       collapsed: false,
-      items: ['ai-tools/codexpro/index', 'ai-tools/codexpro/windows-setup'],
+      items: [
+        'ai-tools/codexpro/index',
+        'ai-tools/codexpro/windows-setup',
+        'ai-tools/codexpro/linux-setup',
+        'ai-tools/codexpro/macos-setup',
+      ],
     },
     'ai-tools/codex-chatgpt-web',
     {

@@ -1,0 +1,410 @@
+---
+id: linux-setup
+title: CodexPro on Linux — Setup Guide
+sidebar_label: Linux setup
+---
+
+# CodexPro on Linux — Setup Guide
+
+This guide sets up CodexPro on a Linux workstation or development host without assuming a specific distribution, username, repository, DNS name, tunnel provider, or JavaScript package manager.
+
+CodexPro runs as a local MCP server for repositories you explicitly allow. The normal flow is:
+
+```text
+install CodexPro
+      ↓
+open the target repository
+      ↓
+codexpro setup
+      ↓
+codexpro start
+      ↓
+copy the generated MCP Server URL
+      ↓
+connect ChatGPT
+      ↓
+doctor / connection-test / repository verification
+```
+
+## Requirements
+
+Verify these prerequisites before setup:
+
+1. Linux with a supported Node.js runtime;
+2. **Node.js 20 or newer**;
+3. one compatible package manager for installing the `codexpro` npm package;
+4. Git;
+5. Codex CLI if your workflow uses Codex-backed Bash/sandbox behavior;
+6. a ChatGPT account that can create a custom MCP integration;
+7. an HTTPS route when ChatGPT must reach the machine from the web.
+
+Check the local tools:
+
+```bash
+node --version
+git --version
+codex --version 2>/dev/null || true
+```
+
+The Node.js installation may come from the distribution package manager, a version manager, a containerized developer environment, or another controlled source. The important contract is the supported Node version, not a specific installer.
+
+## Install CodexPro
+
+The upstream reference command uses npm:
+
+```bash
+npm install -g codexpro
+```
+
+The setup itself does not need to depend on npm storage layout. A compatible package manager may be used if it installs the requested package version and exposes `codexpro` on `PATH`.
+
+Examples:
+
+```bash
+# npm
+npm install -g codexpro
+
+# pnpm
+pnpm add -g codexpro
+
+# Bun
+bun add -g codexpro
+
+# Yarn Classic
+# yarn global add codexpro
+```
+
+Verify the result independently of the package manager:
+
+```bash
+codexpro --version
+command -v codexpro
+```
+
+Do not hardcode a package-manager-specific global package path into reusable scripts unless a version-specific patch workflow genuinely requires direct package-file access.
+
+## Initialize a repository
+
+Move into the repository that ChatGPT should be allowed to work with:
+
+```bash
+cd /path/to/your/repository
+```
+
+Run the setup flow:
+
+```bash
+codexpro setup
+```
+
+Setup should create or update CodexPro's local configuration for the selected repository and prepare the connection flow. Keep project-specific configuration scoped to the repository or CodexPro state rather than global shell startup files whenever possible.
+
+## Start CodexPro
+
+For normal daily use from the same repository:
+
+```bash
+codexpro start
+```
+
+To select a repository explicitly:
+
+```bash
+codexpro start --root /path/to/your/repository
+```
+
+Useful execution modes include:
+
+```bash
+codexpro start --no-bash
+codexpro start --tool-mode minimal
+codexpro start --tool-mode full
+codexpro start --mode handoff
+codexpro start --mode pro
+codexpro start --headless
+```
+
+Use the least-privileged mode that still satisfies the workflow.
+
+## Local-only operation
+
+If the server should remain reachable only from the local machine:
+
+```bash
+codexpro start --tunnel none
+```
+
+Local-only mode is appropriate for local testing, reverse proxies you manage separately, or environments where an external tunnel is not required.
+
+Do not expose the MCP listener directly to the public Internet without the authentication and transport controls expected by CodexPro.
+
+## Public HTTPS options
+
+ChatGPT web needs an HTTPS URL that can reach the local MCP service. CodexPro supports several transport patterns.
+
+### Quick Cloudflare tunnel
+
+For a temporary Cloudflare URL:
+
+```bash
+codexpro start --tunnel cloudflare
+```
+
+A quick tunnel is convenient for evaluation, but its public URL may change between sessions.
+
+### Stable Cloudflare hostname
+
+For a stable hostname, first create persistent token state:
+
+```bash
+mkdir -p ~/.codexpro
+openssl rand -hex 32 > ~/.codexpro/http-token
+chmod 600 ~/.codexpro/http-token
+```
+
+Then start the stable tunnel configuration with deployment-specific values:
+
+```bash
+codexpro stable \
+  --hostname codexpro.example.com \
+  --tunnel-name codexpro
+```
+
+Replace both values with your own DNS hostname and tunnel name. Never publish a real authentication token or token-bearing connector URL in repository documentation.
+
+### ngrok
+
+If your environment uses ngrok:
+
+```bash
+codexpro ngrok --hostname your.ngrok-free.dev
+```
+
+Use the hostname assigned to or configured for your own ngrok account.
+
+### Tailscale
+
+For a Tailscale-based route:
+
+```bash
+codexpro tailscale --hostname your-device.your-tailnet.ts.net
+```
+
+Use the hostname belonging to the machine and tailnet that should expose the service.
+
+## Connect ChatGPT
+
+After CodexPro starts, copy the exact Server URL generated by the running process.
+
+In ChatGPT, create the custom MCP integration/plugin according to the current Developer Mode UI and use:
+
+| Field | Value |
+|---|---|
+| Name | any clear deployment-specific name |
+| Server URL | exact URL generated by CodexPro |
+| Authentication | the mode required by the generated endpoint |
+| Permissions | only the actions required by the workflow |
+
+If the generated URL contains a CodexPro token, treat the **entire URL as a secret**.
+
+Do not store it in:
+
+- Git;
+- shell history intentionally copied into documentation;
+- issue trackers;
+- screenshots intended for public use;
+- CI logs.
+
+## Verify the installation
+
+Run the built-in diagnostics:
+
+```bash
+codexpro doctor
+```
+
+If ChatGPT cannot reach the connector, run:
+
+```bash
+codexpro connection-test
+```
+
+Inspect the effective setup when needed:
+
+```bash
+codexpro settings
+codexpro inspect
+codexpro review
+```
+
+A minimum acceptance test should prove that:
+
+- the selected repository opens successfully;
+- reads/searches remain inside allowed roots;
+- write tools are only present when the configured write mode allows them;
+- Bash behavior matches the selected policy;
+- blocked paths such as secrets and Git internals remain protected;
+- the public HTTPS endpoint reaches the intended local process;
+- a ChatGPT session can complete a read → controlled edit → verification loop on a disposable test repository.
+
+## Multiple repositories
+
+One CodexPro process can allow multiple projects:
+
+```bash
+codexpro settings set \
+  --project ~/code/web \
+  --project ~/code/api
+
+codexpro settings show
+codexpro start
+```
+
+Inside ChatGPT, open only the repository required for the current task. Avoid using the entire home directory as a general-purpose workspace root.
+
+For stronger isolation between different ChatGPT accounts, trust zones, or clients, run separate CodexPro processes with separate ports, state, and Server URLs.
+
+## Linux filesystem and permission guidance
+
+Prefer project roots such as:
+
+```text
+~/code/my-project
+/opt/workspaces/my-project
+/srv/dev/my-project
+```
+
+over broad roots such as:
+
+```text
+/
+/home
+/home/<user>
+```
+
+The CodexPro process should run as the developer/service account that legitimately owns or is allowed to modify the target repositories. Avoid running it as `root` merely to bypass filesystem-permission problems.
+
+If a repository requires privileged writes, fix the repository ownership/ACL model rather than broadening CodexPro privileges.
+
+## Shell and PATH considerations
+
+A global package install can place the `codexpro` shim in different directories depending on the package manager and Node installation method.
+
+Check the executable actually used:
+
+```bash
+command -v codexpro
+readlink -f "$(command -v codexpro)" 2>/dev/null || true
+```
+
+For service environments, remember that non-interactive shells may have a smaller `PATH` than your interactive terminal. Configure the service environment explicitly rather than sourcing an entire user shell profile containing unrelated secrets.
+
+## Running headless
+
+CodexPro exposes a headless start mode:
+
+```bash
+codexpro start --headless
+```
+
+Use this only after the repository, tunnel, token, and permissions have been validated interactively. If you later wrap CodexPro in systemd, a container, or another service supervisor, keep these principles:
+
+- run as a non-root service account where possible;
+- set an explicit working directory;
+- provide only required environment variables;
+- keep credentials outside the unit file/repository;
+- configure restart behavior carefully so an invalid configuration does not create a rapid failure loop;
+- preserve logs without printing connector tokens.
+
+The exact supervisor configuration is environment-specific and should not be copied from another server blindly.
+
+## Update CodexPro
+
+With npm, the upstream update flow is:
+
+```bash
+npm install -g codexpro@latest
+codexpro --version
+```
+
+With another package manager, use its equivalent global-update/install command.
+
+After any update:
+
+1. record the new CodexPro version;
+2. restart the CodexPro process;
+3. run `codexpro doctor`;
+4. re-run `codexpro connection-test` if the connector path changed or fails;
+5. verify repository write and Bash boundaries;
+6. review version-specific local patches before reapplying them.
+
+Do not assume a source patch written for an older CodexPro build remains valid after an update.
+
+## Troubleshooting
+
+### `codexpro: command not found`
+
+Check the package manager's global binary directory and your current `PATH`:
+
+```bash
+command -v codexpro
+printf '%s\n' "$PATH"
+```
+
+Do not solve this by hardcoding another user's package path.
+
+### ChatGPT cannot connect
+
+Run:
+
+```bash
+codexpro connection-test
+```
+
+Then verify:
+
+- the local process is still running;
+- the HTTPS route is active;
+- DNS points to the intended tunnel;
+- firewall policy permits the required outbound/inbound tunnel traffic;
+- the Server URL in ChatGPT matches the current generated URL;
+- the token has not been rotated without updating the connector.
+
+### Repository access is too broad
+
+Stop the process and restart with a narrower root:
+
+```bash
+codexpro start --root /path/to/specific/repository
+```
+
+### Bash should be disabled
+
+Start without the Bash capability:
+
+```bash
+codexpro start --no-bash
+```
+
+### Write tools should not be advertised
+
+Use an appropriate non-writing/handoff configuration instead of relying on prompt instructions alone. Verify the advertised tool list after changing the mode.
+
+## Acceptance checklist
+
+- [ ] Node.js 20+ is installed.
+- [ ] `codexpro` resolves on `PATH` independently of package-manager storage layout.
+- [ ] The target repository is an explicit allowed workspace.
+- [ ] `codexpro setup` completes for the target repository.
+- [ ] `codexpro doctor` passes or reports only understood environment-specific warnings.
+- [ ] Local-only or public HTTPS mode matches the intended deployment.
+- [ ] Public connections use a CodexPro token.
+- [ ] The token and token-bearing URL are not committed or published.
+- [ ] ChatGPT can reach the correct Server URL.
+- [ ] Repository reads and writes remain within allowed roots.
+- [ ] Bash/write capabilities match the selected policy.
+- [ ] A disposable end-to-end read → edit → verification workflow succeeds.
+
+## Recommended operational rule
+
+Treat CodexPro as a **repository-scoped local development service**, not as a general remote shell for the Linux host. Keep the workspace narrow, credentials private, privileges minimal, and the public tunnel tied to the exact process you intend ChatGPT to reach.
