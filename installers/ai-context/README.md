@@ -46,6 +46,8 @@ Run against an existing Git work-tree root for the dedicated context repository:
 
 `-OwnedModified replace` permits replacing a modified installer-owned file/block after writing a recovery copy under ignored `.qbit-toolkit/ai-context/backups/`. It never overrides an unowned conflict. `-AdoptMatching` explicitly adopts byte-/block-identical pre-existing generated content into installer ownership.
 
+`-MigrateLegacy` is an explicit, fail-closed migration path for the pre-installer manual rollout. It accepts only the recognized legacy lifecycle sections plus a semantically equivalent member `config.json`; unknown or modified legacy content remains a conflict. During migration, repository-specific `AI_CONTEXT.md` role text is preserved while the lifecycle/authority tail becomes an installer-managed block.
+
 State is written last to `.qbit/toolkit/installed/ai-context.json`. Mutations snapshot touched files and roll back byte-exact content if a write fails.
 
 ## Security and authority

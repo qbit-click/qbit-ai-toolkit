@@ -82,8 +82,19 @@ class ValidateUnitTests(unittest.TestCase):
         write_text(self.root / "catalog.json", json.dumps(catalog) + "\n")
 
     def copy_ai_fixture(self) -> None:
+        def ignore_runtime_context_cache(directory: str, names: list[str]) -> set[str]:
+            path = Path(directory)
+            if path.name == "context" and "cache" in names:
+                return {"cache"}
+            return set()
+
         for directory in (".ai", ".serena", ".codex", "tests/e2e", "installers"):
-            shutil.copytree(REPO_ROOT / directory, self.root / directory, dirs_exist_ok=True)
+            shutil.copytree(
+                REPO_ROOT / directory,
+                self.root / directory,
+                dirs_exist_ok=True,
+                ignore=ignore_runtime_context_cache if directory == ".ai" else None,
+            )
         for file in ("catalog.json",):
             shutil.copy2(REPO_ROOT / file, self.root / file)
 
@@ -146,6 +157,17 @@ class ValidateUnitTests(unittest.TestCase):
         write_text(catalog_path, json.dumps(catalog) + "\n")
         validate.validate_catalog()
         self.assertFalse(any("rust supported profile" in item for item in validate.errors), validate.errors)
+
+    def test_all_files_excludes_ai_context_runtime_artifacts(self) -> None:
+        write_text(self.root / ".ai" / "context" / "cache" / "project-context" / "runtime.json", "{}\n")
+        write_text(self.root / ".ai-bridge" / "context-runtime.json", "{}\n")
+        write_text(self.root / ".ai-bridge" / "README.md", "# Bridge\n")
+        write_text(self.root / "source.txt", "source\n")
+        names = {path.relative_to(self.root).as_posix() for path in validate.all_files()}
+        self.assertNotIn(".ai/context/cache/project-context/runtime.json", names)
+        self.assertNotIn(".ai-bridge/context-runtime.json", names)
+        self.assertIn(".ai-bridge/README.md", names)
+        self.assertIn("source.txt", names)
 
     def test_unresolved_placeholder_boundaries(self) -> None:
         write_text(self.root / "installers" / "codex-ai-tooling" / "templates" / "common" / "file.txt", "{{" + "PROJECT" + "}}\n")

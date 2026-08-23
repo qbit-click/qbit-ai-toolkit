@@ -4,7 +4,7 @@ $ErrorActionPreference = 'Stop'
 $Script:InstallerRoot = ([System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))).TrimEnd('\','/')
 $Script:ToolkitRoot = ([System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..\..'))).TrimEnd('\','/')
 $Script:InstallerId = 'installer.ai-context'
-$Script:InstallerVersion = '1.0.0'
+$Script:InstallerVersion = '1.0.1'
 $Script:StatePath = '.qbit/toolkit/installed/ai-context.json'
 $Script:BlockBegin = '<!-- qbit-toolkit:ai-context:start -->'
 $Script:BlockEnd = '<!-- qbit-toolkit:ai-context:end -->'
@@ -247,6 +247,8 @@ function New-Spec([string]$Mode,[hashtable]$Variables) {
   $Files = @{}
   $Blocks = @{}
   $Seeds = @{}
+  $LegacyFiles = @{}
+  $LegacyBlocks = @{}
   $Blocks['.gitignore'] = [pscustomobject]@{ Begin=$Script:GitignoreBegin; End=$Script:GitignoreEnd; Content=".qbit-toolkit/ai-context/backups/`n.qbit-toolkit/ai-context/transactions/`n" }
   if ($Mode -eq 'member') {
     $Files['.ai/context/context.ps1'] = Read-Template 'templates/common/member/context.ps1'
@@ -255,7 +257,11 @@ function New-Spec([string]$Mode,[hashtable]$Variables) {
     $Blocks['AGENTS.md'] = [pscustomobject]@{ Begin=$Script:BlockBegin; End=$Script:BlockEnd; Content=(Render-Template 'templates/common/member/agents-block.md.tpl' $Variables) }
     $Blocks['AI_CONTEXT.md'] = [pscustomobject]@{ Begin=$Script:BlockBegin; End=$Script:BlockEnd; Content=(Render-Template 'templates/common/member/AI_CONTEXT.md.tpl' $Variables) }
     $Blocks['.ai-bridge/.gitignore'] = [pscustomobject]@{ Begin=$Script:GitignoreBegin; End=$Script:GitignoreEnd; Content=(Read-Template 'templates/common/member/bridge.gitignore') }
+    $Seeds['AI_CONTEXT.md'] = Render-Template 'templates/common/member/AI_CONTEXT-header.md.tpl' $Variables
     $Seeds['.ai-bridge/README.md'] = Read-Template 'templates/common/member/bridge.README.md'
+    $LegacyBlocks['AGENTS.md'] = Render-Template 'templates/common/member/legacy-agents-section.md.tpl' $Variables
+    $LegacyBlocks['AI_CONTEXT.md'] = Render-Template 'templates/common/member/legacy-ai-context-tail.md.tpl' $Variables
+    $LegacyBlocks['.ai-bridge/.gitignore'] = Read-Template 'templates/common/member/bridge.gitignore'
   } else {
     $Files['tooling/context-lifecycle.ps1'] = Read-Template 'templates/common/central/tooling/context-lifecycle.ps1'
     $Files['templates/member/context.ps1'] = Read-Template 'templates/common/member/context.ps1'
@@ -285,10 +291,75 @@ function New-Spec([string]$Mode,[hashtable]$Variables) {
     }
     foreach ($Destination in $SeedMap.Keys) { $Seeds[$Destination] = Render-Template $SeedMap[$Destination] $Variables }
   }
-  return [pscustomobject]@{ Files=$Files; Blocks=$Blocks; Seeds=$Seeds }
+  return [pscustomobject]@{ Files=$Files; Blocks=$Blocks; Seeds=$Seeds; LegacyFiles=$LegacyFiles; LegacyBlocks=$LegacyBlocks }
 }
 
-function New-Plan([string]$Root,[object]$Spec,[object]$State,[string]$OwnedModified,[bool]$AdoptMatching) {
+function Test-JsonEquivalent([object]$Left,[object]$Right) {
+  if ($null -eq $Left -or $null -eq $Right) { return $null -eq $Left -and $null -eq $Right }
+  $LeftIsObject = $Left -is [pscustomobject]
+  $RightIsObject = $Right -is [pscustomobject]
+  if ($LeftIsObject -or $RightIsObject) {
+    if (-not ($LeftIsObject -and $RightIsObject)) { return $false }
+    [string[]]$LeftNames = @($Left.PSObject.Properties.Name | Sort-Object)
+    [string[]]$RightNames = @($Right.PSObject.Properties.Name | Sort-Object)
+    if (($LeftNames -join "`n") -cne ($RightNames -join "`n")) { return $false }
+    foreach ($Name in $LeftNames) {
+      if (-not (Test-JsonEquivalent $Left.$Name $Right.$Name)) { return $false }
+    }
+    return $true
+  }
+  $LeftIsArray = $Left -is [System.Array]
+  $RightIsArray = $Right -is [System.Array]
+  if ($LeftIsArray -or $RightIsArray) {
+    if (-not ($LeftIsArray -and $RightIsArray) -or $Left.Count -ne $Right.Count) { return $false }
+    for ($Index=0; $Index -lt $Left.Count; $Index++) { if (-not (Test-JsonEquivalent $Left[$Index] $Right[$Index])) { return $false } }
+    return $true
+  }
+  if ($Left.GetType() -ne $Right.GetType()) { return $false }
+  return $Left -ceq $Right
+}
+
+function Test-JsonFileEquivalent([string]$Path,[string]$ExpectedContent) {
+  try {
+    $Current = [IO.File]::ReadAllText($Path,[Text.Encoding]::UTF8) | ConvertFrom-Json
+    $Expected = $ExpectedContent | ConvertFrom-Json
+    return Test-JsonEquivalent $Current $Expected
+  } catch { return $false }
+}
+
+function Get-NormalizedFileText([string]$Path) {
+  if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { return $null }
+  return [IO.File]::ReadAllText($Path,[Text.Encoding]::UTF8).Replace("`r`n","`n").Replace("`r","`n")
+}
+
+function Test-LegacyTrailingContent([string]$Path,[string]$LegacyContent) {
+  $Text = Get-NormalizedFileText $Path
+  if ($null -eq $Text) { return $false }
+  $Needle = $LegacyContent.Replace("`r`n","`n").Replace("`r","`n").Trim("`n")
+  $Trimmed = $Text.TrimEnd("`r","`n")
+  return $Trimmed.EndsWith($Needle,[StringComparison]::Ordinal)
+}
+
+function Test-LegacyMarkerPresent([string]$Path,[string]$LegacyContent) {
+  $Text = Get-NormalizedFileText $Path
+  if ($null -eq $Text) { return $false }
+  $FirstLine = ($LegacyContent.Replace("`r`n","`n").Replace("`r","`n") -split "`n")[0]
+  return -not [string]::IsNullOrWhiteSpace($FirstLine) -and $Text.Contains($FirstLine)
+}
+
+function Remove-LegacyTrailingContent([string]$Path,[string]$LegacyContent) {
+  $Doc = Get-TextDocument $Path
+  if ($null -eq $Doc) { throw "Legacy migration target is missing: $Path" }
+  $Normalized = $Doc.Text.Replace("`r`n","`n").Replace("`r","`n")
+  $Needle = $LegacyContent.Replace("`r`n","`n").Replace("`r","`n").Trim("`n")
+  $Trimmed = $Normalized.TrimEnd("`r","`n")
+  if (-not $Trimmed.EndsWith($Needle,[StringComparison]::Ordinal)) { throw "Legacy migration content no longer matches: $Path" }
+  $Prefix = $Trimmed.Substring(0,$Trimmed.Length-$Needle.Length).TrimEnd("`r","`n")
+  $Result = if ([string]::IsNullOrEmpty($Prefix)) { '' } else { $Prefix + "`n" }
+  Write-TextDocument $Path $Result $Doc.NewLine ([bool]$Doc.Bom)
+}
+
+function New-Plan([string]$Root,[object]$Spec,[object]$State,[string]$OwnedModified,[bool]$AdoptMatching,[bool]$MigrateLegacy) {
   $Actions = New-Object Collections.Generic.List[object]
   $Conflicts = New-Object Collections.Generic.List[string]
   $OldFiles = Get-StateFileMap $State
@@ -306,6 +377,12 @@ function New-Plan([string]$Root,[object]$Spec,[object]$State,[string]$OwnedModif
       if (-not $Exists) { $Actions.Add([pscustomobject]@{Kind='file';Action='create';Path=$RelativePath;ExpectedHash=$ExpectedHash}) }
       elseif ($CurrentHash -ceq $ExpectedHash -and $AdoptMatching) { $Actions.Add([pscustomobject]@{Kind='file';Action='adopt';Path=$RelativePath;ExpectedHash=$ExpectedHash}) }
       elseif ($CurrentHash -ceq $ExpectedHash) { $Conflicts.Add("Matching unowned file requires -AdoptMatching: $RelativePath") }
+      elseif ($MigrateLegacy -and $RelativePath -ceq '.ai/context/config.json' -and (Test-JsonFileEquivalent $Path ([string]$Spec.Files[$RelativePath]))) {
+        $Actions.Add([pscustomobject]@{Kind='file';Action='migrate';Path=$RelativePath;ExpectedHash=$ExpectedHash})
+      }
+      elseif ($MigrateLegacy -and $Spec.LegacyFiles.ContainsKey($RelativePath) -and ((Get-NormalizedFileText $Path).TrimEnd("`r","`n") -ceq ([string]$Spec.LegacyFiles[$RelativePath]).TrimEnd("`r","`n"))) {
+        $Actions.Add([pscustomobject]@{Kind='file';Action='migrate';Path=$RelativePath;ExpectedHash=$ExpectedHash})
+      }
       else { $Conflicts.Add("Unowned file conflict at $RelativePath") }
       continue
     }
@@ -325,7 +402,16 @@ function New-Plan([string]$Root,[object]$Spec,[object]$State,[string]$OwnedModif
     $Info = Get-BlockInfo $Path $Block.Begin $Block.End
     $Owned = $OldBlocks.ContainsKey($RelativePath)
     if (-not $Owned) {
-      if ($Info.Status -in @('absent-file','absent-block')) { $Actions.Add([pscustomobject]@{Kind='block';Action='create';Path=$RelativePath;ExpectedHash=$ExpectedHash}) }
+      if ($Info.Status -in @('absent-file','absent-block')) {
+        if ($Spec.LegacyBlocks.ContainsKey($RelativePath) -and (Test-LegacyTrailingContent $Path ([string]$Spec.LegacyBlocks[$RelativePath]))) {
+          if ($MigrateLegacy) { $Actions.Add([pscustomobject]@{Kind='block';Action='migrate';Path=$RelativePath;ExpectedHash=$ExpectedHash}) }
+          else { $Conflicts.Add("Recognized legacy content requires -MigrateLegacy: $RelativePath") }
+        }
+        elseif ($Spec.LegacyBlocks.ContainsKey($RelativePath) -and (Test-LegacyMarkerPresent $Path ([string]$Spec.LegacyBlocks[$RelativePath]))) {
+          $Conflicts.Add("Legacy-like content is modified or unrecognized at $RelativePath")
+        }
+        else { $Actions.Add([pscustomobject]@{Kind='block';Action='create';Path=$RelativePath;ExpectedHash=$ExpectedHash}) }
+      }
       elseif ($Info.Status -eq 'present' -and $Info.Hash -ceq $ExpectedHash -and $AdoptMatching) { $Actions.Add([pscustomobject]@{Kind='block';Action='adopt';Path=$RelativePath;ExpectedHash=$ExpectedHash}) }
       elseif ($Info.Status -eq 'present' -and $Info.Hash -ceq $ExpectedHash) { $Conflicts.Add("Matching unowned managed block requires -AdoptMatching: $RelativePath") }
       elseif ($Info.Status -eq 'malformed') { $Conflicts.Add("Managed block markers are malformed in $RelativePath") }
@@ -406,7 +492,8 @@ function Invoke-AiContextMutation([string]$Root,[object]$Spec,[object]$State,[ob
   $Seeded=New-Object Collections.Generic.List[string]
   if ($null -ne $State) { foreach($Path in @($State.seededFiles)){ $Seeded.Add([string]$Path) } }
   try {
-    foreach($Item in $Plan.Actions) {
+    $OrderedActions = @($Plan.Actions | Sort-Object @{Expression={ if ($_.Kind -eq 'seed') { 0 } elseif ($_.Kind -eq 'file') { 1 } else { 2 } }}, @{Expression={$_.Path}})
+    foreach($Item in $OrderedActions) {
       $Relative=[string]$Item.Path
       $Path=Join-UnderRoot $Root $Relative
       if ($Item.Kind -eq 'file') {
@@ -418,6 +505,7 @@ function Invoke-AiContextMutation([string]$Root,[object]$Spec,[object]$State,[ob
         if ($Item.Action -eq 'adopt') { continue }
         Save-Original $Snapshots $Path
         if ($Item.Action -eq 'replace') { Backup-ModifiedPath $Root $Relative }
+        if ($Item.Action -eq 'migrate') { Remove-LegacyTrailingContent $Path ([string]$Spec.LegacyBlocks[$Relative]) }
         $Block=$Spec.Blocks[$Relative]
         Set-ManagedBlock $Path $Block.Begin $Block.End ([string]$Block.Content)
       } elseif ($Item.Kind -eq 'seed') {

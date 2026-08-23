@@ -184,10 +184,15 @@ def all_files() -> list[Path]:
         dirs[:] = [
             name
             for name in dirs
-            if name not in excluded_dirs and not (relative_dir == Path("website") and name == "build")
+            if name not in excluded_dirs
+            and not (relative_dir == Path("website") and name == "build")
+            and not (relative_dir == Path(".ai/context") and name == "cache")
         ]
         for filename in filenames:
             path = current / filename
+            relative_path = path.relative_to(ROOT)
+            if relative_path.parts and relative_path.parts[0] == ".ai-bridge" and filename not in {"README.md", ".gitignore"}:
+                continue
             if path.suffix not in excluded_suffixes:
                 files.append(path)
     return files

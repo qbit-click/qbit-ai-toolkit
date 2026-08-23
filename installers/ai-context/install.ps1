@@ -11,6 +11,7 @@ param(
   [string]$ContextBranch='',
   [ValidateSet('fail','replace')][string]$OwnedModified='fail',
   [switch]$AdoptMatching,
+  [switch]$MigrateLegacy,
   [ValidateSet('text','json')][string]$Format='text'
 )
 
@@ -67,7 +68,7 @@ try {
 
     $Variables=Get-Variables $EffectiveProject $EffectiveDisplay $EffectiveRepository $EffectiveContextRepository $EffectiveRemote $EffectiveBranch
     $Spec=New-Spec $EffectiveMode $Variables
-    $Plan=New-Plan $Root $Spec $State $OwnedModified ([bool]$AdoptMatching)
+    $Plan=New-Plan $Root $Spec $State $OwnedModified ([bool]$AdoptMatching) ([bool]$MigrateLegacy)
     $ActionText=@($Plan.Actions|ForEach-Object{"$($_.Action) $($_.Path)"})
 
     if($Operation -eq 'plan'){
