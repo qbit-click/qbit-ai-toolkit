@@ -10,7 +10,7 @@ Before substantive Codex work, the agent automatically runs `.ai/context/context
 
 After a substantive validated milestone that changes durable continuity state, the agent creates `.ai-bridge/context-checkpoint.json` and runs `.ai/context/context.ps1 checkpoint`. Checkpoints are milestone-driven, not per-message.
 
-The current context source is the sibling Git repository `../qbit-ai-context`. This is zero-touch when the project repositories are cloned as siblings; a future network remote can replace this source without changing the lifecycle contract.
+The canonical context source is the private Git repository `https://github.com/qbit-click/qbit-ai-context.git`. The lifecycle automatically clones or refreshes it into the ignored project-local context cache; no sibling checkout is required.
 
 ## Authority and safety
 

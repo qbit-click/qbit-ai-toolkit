@@ -3,7 +3,7 @@
     "project":  "qbit",
     "repository":  "qbit-ai-toolkit",
     "context":  {
-                    "remote":  "../qbit-ai-context",
+                    "remote":  "https://github.com/qbit-click/qbit-ai-context.git",
                     "branch":  "main",
                     "cachePath":  ".ai/context/cache/project-context"
                 },
