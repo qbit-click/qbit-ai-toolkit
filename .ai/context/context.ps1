@@ -28,6 +28,65 @@ function Invoke-Git {
     [pscustomobject]@{ ExitCode = $code; Output = ($output -join "`n").Trim() }
 }
 
+function Get-GitHubCredentialPrefix {
+    param([string]$Remote)
+
+    if ($Remote -notmatch '^https?://github\.com(?:/|$)') { return @() }
+    $gh = Get-Command gh -ErrorAction SilentlyContinue
+    if ($null -eq $gh) { return @() }
+
+    return @(
+        '-c', 'credential.helper=',
+        '-c', 'credential.helper=!gh auth git-credential'
+    )
+}
+
+function Invoke-GitNetwork {
+    param(
+        [Parameter(Mandatory = $true)][string]$WorkingDirectory,
+        [Parameter(Mandatory = $true)][string[]]$Arguments,
+        [Parameter(Mandatory = $true)][string]$Remote,
+        [switch]$NoWorkingDirectory,
+        [switch]$AllowFailure
+    )
+
+    $previousErrorActionPreference = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        if ($NoWorkingDirectory) {
+            $output = @(& git @Arguments 2>&1)
+        } else {
+            $output = @(& git -C $WorkingDirectory @Arguments 2>&1)
+        }
+        $code = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
+
+    if ($code -ne 0) {
+        $credentialPrefix = @(Get-GitHubCredentialPrefix -Remote $Remote)
+        if ($credentialPrefix.Count -gt 0) {
+            $previousErrorActionPreference = $ErrorActionPreference
+            $ErrorActionPreference = 'Continue'
+            try {
+                if ($NoWorkingDirectory) {
+                    $output = @(& git @credentialPrefix @Arguments 2>&1)
+                } else {
+                    $output = @(& git @credentialPrefix -C $WorkingDirectory @Arguments 2>&1)
+                }
+                $code = $LASTEXITCODE
+            } finally {
+                $ErrorActionPreference = $previousErrorActionPreference
+            }
+        }
+    }
+
+    if ($code -ne 0 -and -not $AllowFailure) {
+        throw "Git network command failed: git $($Arguments -join ' ')"
+    }
+    [pscustomobject]@{ ExitCode = $code; Output = ($output -join "`n").Trim() }
+}
+
 $repoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
 $configPath = Join-Path $PSScriptRoot 'config.json'
 if (-not (Test-Path -LiteralPath $configPath -PathType Leaf)) {
@@ -73,15 +132,8 @@ if (-not (Test-Path -LiteralPath (Join-Path $cachePath '.git'))) {
         }
     }
     New-Item -ItemType Directory -Path (Split-Path -Parent $cachePath) -Force | Out-Null
-    $previousErrorActionPreference = $ErrorActionPreference
-    $ErrorActionPreference = 'Continue'
-    try {
-        $cloneOutput = @(& git clone --branch $branch --single-branch -- $remote $cachePath 2>&1)
-        $cloneCode = $LASTEXITCODE
-    } finally {
-        $ErrorActionPreference = $previousErrorActionPreference
-    }
-    if ($cloneCode -ne 0) { throw 'Unable to clone central AI context. Check Git authentication/network access.' }
+    $clone = Invoke-GitNetwork -WorkingDirectory $repoRoot -Arguments @('clone', '--branch', $branch, '--single-branch', '--', $remote, $cachePath) -Remote $remote -NoWorkingDirectory -AllowFailure
+    if ($clone.ExitCode -ne 0) { throw 'Unable to clone central AI context. Check Git authentication/network access.' }
 } else {
     $actualRemoteRaw = (Invoke-Git -WorkingDirectory $cachePath -Arguments @('remote', 'get-url', 'origin')).Output
     $actualRemoteIsUrl = $actualRemoteRaw -match '^[a-zA-Z][a-zA-Z0-9+.-]*://'
@@ -90,16 +142,27 @@ if (-not (Test-Path -LiteralPath (Join-Path $cachePath '.git'))) {
     } else {
         [System.IO.Path]::GetFullPath($actualRemoteRaw).TrimEnd([char[]]@('\','/'))
     }
-    if ($actualRemote -ne $remote) {
-        throw 'AI context cache origin does not match the configured central remote.'
-    }
     $actualBranch = (Invoke-Git -WorkingDirectory $cachePath -Arguments @('rev-parse', '--abbrev-ref', 'HEAD')).Output
     if ($actualBranch -ne $branch) {
         throw "AI context cache must remain on configured branch '$branch'."
     }
 
-    Invoke-Git -WorkingDirectory $cachePath -Arguments @('fetch', 'origin', $branch) | Out-Null
     $dirty = -not [string]::IsNullOrWhiteSpace((Invoke-Git -WorkingDirectory $cachePath -Arguments @('status', '--porcelain')).Output)
+    if ($actualRemote -ne $remote) {
+        if ($dirty) {
+            throw 'AI context cache origin differs from the configured central remote and the cache is dirty; automatic origin migration was refused.'
+        }
+
+        Invoke-Git -WorkingDirectory $cachePath -Arguments @('remote', 'set-url', 'origin', $remote) | Out-Null
+        $migrationFetch = Invoke-GitNetwork -WorkingDirectory $cachePath -Arguments @('fetch', 'origin', $branch) -Remote $remote -AllowFailure
+        if ($migrationFetch.ExitCode -ne 0) {
+            Invoke-Git -WorkingDirectory $cachePath -Arguments @('remote', 'set-url', 'origin', $actualRemoteRaw) | Out-Null
+            throw 'AI context cache origin migration failed; the previous origin was restored.'
+        }
+    } else {
+        Invoke-GitNetwork -WorkingDirectory $cachePath -Arguments @('fetch', 'origin', $branch) -Remote $remote | Out-Null
+    }
+
     if ($dirty) {
         if ($Action -eq 'checkpoint') {
             throw 'Automated checkpoint refused because the AI context cache has pre-existing uncommitted changes.'
