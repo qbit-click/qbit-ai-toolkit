@@ -132,6 +132,21 @@ class ValidateUnitTests(unittest.TestCase):
         validate.validate_catalog()
         self.assertTrue(any("Manifest consumers invalid" in item for item in validate.errors))
 
+    def test_non_codex_installer_does_not_require_rust_profile(self) -> None:
+        self.minimal_installer()
+        manifest_path = self.root / "installers" / "codex-ai-tooling" / "manifest.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        manifest["id"] = "installer.ai-context"
+        manifest["supportedProfiles"] = ["generic"]
+        manifest["defaultProfile"] = "generic"
+        write_text(manifest_path, json.dumps(manifest) + "\n")
+        catalog_path = self.root / "catalog.json"
+        catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
+        catalog["assets"][0]["id"] = "installer.ai-context"
+        write_text(catalog_path, json.dumps(catalog) + "\n")
+        validate.validate_catalog()
+        self.assertFalse(any("rust supported profile" in item for item in validate.errors), validate.errors)
+
     def test_unresolved_placeholder_boundaries(self) -> None:
         write_text(self.root / "installers" / "codex-ai-tooling" / "templates" / "common" / "file.txt", "{{" + "PROJECT" + "}}\n")
         write_text(self.root / "website" / "i18n" / "fa" / "docusaurus-plugin-content-docs" / "current" / "asset-contract.md", "`{{" + "PROJECT" + "}}`\n")

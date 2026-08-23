@@ -1,0 +1,31 @@
+{
+  "$schema": "../../schemas/installer-manifest.schema.json",
+  "id": "installer.ai-context",
+  "name": "AI Context Lifecycle",
+  "version": "1.0.0",
+  "kind": "installer",
+  "status": "stable",
+  "consumers": [
+    "shared"
+  ],
+  "supportedPlatforms": [
+    "windows"
+  ],
+  "supportedProfiles": [
+    "generic"
+  ],
+  "defaultProfile": "generic",
+  "entrypoints": {
+    "powershell": "install.ps1",
+    "posix": "install.sh"
+  },
+  "verifiers": {
+    "powershell": "verify.ps1",
+    "posix": "verify.sh"
+  },
+  "uninstallers": {
+    "powershell": "uninstall.ps1",
+    "posix": "uninstall.sh"
+  },
+  "description": "Installs and maintains zero-touch project AI context lifecycle assets for member repositories and dedicated central context repositories. Version 1.0 supports Windows hosts."
+}

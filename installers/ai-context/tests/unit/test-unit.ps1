@@ -1,0 +1,28 @@
+Set-StrictMode -Version 2
+$ErrorActionPreference='Stop'
+$InstallerRoot=(Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
+. (Join-Path $InstallerRoot 'lib/installer.ps1')
+$Passed=0;$Failed=0
+function Assert([bool]$Condition,[string]$Message){if(-not $Condition){throw $Message}}
+function ExpectFail([scriptblock]$Body,[string]$Text){$FailedAsExpected=$false;try{&$Body}catch{$FailedAsExpected=$_.Exception.Message -like "*$Text*"};Assert $FailedAsExpected "Expected failure containing '$Text'"}
+function Test([string]$Name,[scriptblock]$Body){try{&$Body;$script:Passed++;Write-Host "PASS $Name"}catch{$script:Failed++;Write-Host "FAIL ${Name}: $($_.Exception.Message)"}}
+
+Test 'safe identifiers accept repository slugs' { Assert ((Assert-SafeId 'qbit-console-api' 'RepositoryId') -eq 'qbit-console-api') 'valid id changed' }
+Test 'identifiers reject traversal and whitespace' { ExpectFail { Assert-SafeId '../bad' 'RepositoryId' } 'must match';ExpectFail { Assert-SafeId 'bad id' 'RepositoryId' } 'must match' }
+Test 'branches reject traversal-like ref names' { ExpectFail { Assert-SafeBranch 'feature/../main' } 'invalid';Assert ((Assert-SafeBranch 'feature/context-v2') -eq 'feature/context-v2') 'valid branch changed' }
+Test 'remote rejects embedded URL credentials' { ExpectFail { Assert-SafeRemote 'https://user:password@example.com/context.git' } 'must not embed credentials' }
+Test 'member templates render without unresolved placeholders' {
+  $V=Get-Variables 'demo' 'Demo' 'demo-api' 'demo-ai-context' 'https://github.com/example/demo-ai-context.git' 'main';$S=New-Spec 'member' $V
+  foreach($Text in @($S.Files.Values)+@($S.Blocks.Values|%{$_.Content})+@($S.Seeds.Values)){Assert (-not ([string]$Text -match '\{\{[A-Z0-9_]+\}\}')) 'unresolved member placeholder'}
+}
+Test 'central templates render without unresolved placeholders' {
+  $V=Get-Variables 'demo' 'Demo' 'demo-ai-context' 'demo-ai-context' 'https://github.com/example/demo-ai-context.git' 'main';$S=New-Spec 'central' $V
+  foreach($Text in @($S.Files.Values)+@($S.Blocks.Values|%{$_.Content})+@($S.Seeds.Values)){Assert (-not ([string]$Text -match '\{\{[A-Z0-9_]+\}\}')) 'unresolved central placeholder'}
+}
+Test 'central seeds and managed tooling are separated' {
+  $V=Get-Variables 'demo' 'Demo' 'demo-ai-context' 'demo-ai-context' 'https://github.com/example/demo-ai-context.git' 'main';$S=New-Spec 'central' $V
+  Assert ($S.Files.ContainsKey('tooling/context-lifecycle.ps1')) 'central tooling not managed';Assert ($S.Seeds.ContainsKey('state/current.md')) 'current state not seeded';Assert (-not $S.Files.ContainsKey('state/current.md')) 'current state incorrectly installer-managed'
+}
+
+if($Failed -gt 0){throw "$Failed unit test(s) failed; $Passed passed."}
+Write-Host "PASS all $Passed AI Context installer unit tests"

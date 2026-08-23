@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://qbit.dev/schemas/ai-context-checkpoint.schema.json",
+  "title": "AI Context Checkpoint",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "repository",
+    "scope",
+    "status",
+    "objective",
+    "confirmedFindings",
+    "decisions",
+    "rejectedApproaches",
+    "validation",
+    "openQuestions",
+    "nextAction"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "repository": { "type": "string", "minLength": 1 },
+    "scope": { "type": "string", "minLength": 1 },
+    "status": {
+      "enum": [
+        "PROPOSED",
+        "IN_PROGRESS",
+        "IMPLEMENTED",
+        "VALIDATED",
+        "APPROVED",
+        "MERGED",
+        "DEPLOYED",
+        "SUPERSEDED",
+        "STALE",
+        "BLOCKED",
+        "UNKNOWN"
+      ]
+    },
+    "objective": { "type": "string", "minLength": 1 },
+    "confirmedFindings": { "type": "array", "items": { "type": "string" } },
+    "decisions": { "type": "array", "items": { "type": "string" } },
+    "rejectedApproaches": { "type": "array", "items": { "type": "string" } },
+    "validation": { "type": "array", "items": { "type": "string" } },
+    "openQuestions": { "type": "array", "items": { "type": "string" } },
+    "nextAction": { "type": "string", "minLength": 1 }
+  }
+}

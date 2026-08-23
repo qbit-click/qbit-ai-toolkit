@@ -256,8 +256,8 @@ def validate_installer_asset(asset: dict, asset_path: Path) -> None:
     for profile in manifest.get("supportedProfiles", []):
         if not (asset_path / "templates" / "profiles" / profile).exists():
             error(f"Supported profile has no template directory: {profile}")
-    if "rust" not in manifest.get("supportedProfiles", []):
-        error(f"Installer manifest must declare rust supported profile: {rel(asset_path)}")
+    if asset.get("id") == "installer.codex-ai-tooling" and "rust" not in manifest.get("supportedProfiles", []):
+        error(f"Codex AI Tooling installer manifest must declare rust supported profile: {rel(asset_path)}")
     for group in ["entrypoints", "verifiers", "uninstallers"]:
         for entry in manifest.get(group, {}).values():
             if not (asset_path / entry).exists():

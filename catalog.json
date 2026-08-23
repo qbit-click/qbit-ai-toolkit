@@ -28,6 +28,30 @@
         "uninstallPosix": "uninstall.sh"
       },
       "integrity": {}
+    },
+    {
+      "id": "installer.ai-context",
+      "kind": "installer",
+      "version": "1.0.0",
+      "path": "installers/ai-context",
+      "consumers": [
+        "shared"
+      ],
+      "status": "stable",
+      "description": "Installs zero-touch project AI context lifecycle assets for member and central context repositories.",
+      "minimumConsumerVersions": {},
+      "supportedPlatforms": [
+        "windows"
+      ],
+      "entrypoints": {
+        "powershell": "install.ps1",
+        "posix": "install.sh",
+        "verifyPowerShell": "verify.ps1",
+        "verifyPosix": "verify.sh",
+        "uninstallPowerShell": "uninstall.ps1",
+        "uninstallPosix": "uninstall.sh"
+      },
+      "integrity": {}
     }
   ]
 }
