@@ -6,3 +6,5 @@ graphify-out/
 .validation-logs/
 test-results/
 .qbit-toolkit-backups/
+.qbit-toolkit/codex-ai-tooling/backups/
+.qbit-toolkit/codex-ai-tooling/transactions/

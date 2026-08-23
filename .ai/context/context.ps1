@@ -1,0 +1,125 @@
+param(
+    [Parameter(Position = 0)]
+    [ValidateSet('start', 'status', 'checkpoint')]
+    [string]$Action = 'start'
+)
+
+Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
+
+function Invoke-Git {
+    param(
+        [Parameter(Mandatory = $true)][string]$WorkingDirectory,
+        [Parameter(Mandatory = $true)][string[]]$Arguments,
+        [switch]$AllowFailure
+    )
+
+    $previousErrorActionPreference = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        $output = @(& git -C $WorkingDirectory @Arguments 2>&1)
+        $code = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
+    if ($code -ne 0 -and -not $AllowFailure) {
+        throw "Git command failed: git $($Arguments -join ' ')"
+    }
+    [pscustomobject]@{ ExitCode = $code; Output = ($output -join "`n").Trim() }
+}
+
+$repoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
+$configPath = Join-Path $PSScriptRoot 'config.json'
+if (-not (Test-Path -LiteralPath $configPath -PathType Leaf)) {
+    throw 'AI context config is missing.'
+}
+
+$config = Get-Content -LiteralPath $configPath -Raw | ConvertFrom-Json
+if ([int]$config.schemaVersion -ne 1) { throw 'Unsupported AI context config schemaVersion.' }
+
+$configuredRemote = [string]$config.context.remote
+$branch = [string]$config.context.branch
+$cacheRelative = [string]$config.context.cachePath
+if ([string]::IsNullOrWhiteSpace($configuredRemote) -or [string]::IsNullOrWhiteSpace($branch) -or [string]::IsNullOrWhiteSpace($cacheRelative)) {
+    throw 'AI context config is incomplete.'
+}
+if ($configuredRemote -match '^[a-zA-Z][a-zA-Z0-9+.-]*://[^/]*@') {
+    throw 'AI context remote URL must not embed credentials.'
+}
+$remoteIsUrl = $configuredRemote -match '^[a-zA-Z][a-zA-Z0-9+.-]*://'
+$remote = if ($remoteIsUrl) {
+    $configuredRemote.TrimEnd('/')
+} elseif ([System.IO.Path]::IsPathRooted($configuredRemote)) {
+    [System.IO.Path]::GetFullPath($configuredRemote).TrimEnd([char[]]@('\','/'))
+} else {
+    [System.IO.Path]::GetFullPath((Join-Path $repoRoot $configuredRemote)).TrimEnd([char[]]@('\','/'))
+}
+
+$cachePath = if ([System.IO.Path]::IsPathRooted($cacheRelative)) {
+    [System.IO.Path]::GetFullPath($cacheRelative)
+} else {
+    [System.IO.Path]::GetFullPath((Join-Path $repoRoot $cacheRelative))
+}
+
+if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
+    throw 'Git is required for AI context lifecycle.'
+}
+
+if (-not (Test-Path -LiteralPath (Join-Path $cachePath '.git'))) {
+    if (Test-Path -LiteralPath $cachePath) {
+        $entries = @(Get-ChildItem -LiteralPath $cachePath -Force -ErrorAction SilentlyContinue)
+        if ($entries.Count -gt 0) {
+            throw 'AI context cache path exists but is not a Git repository.'
+        }
+    }
+    New-Item -ItemType Directory -Path (Split-Path -Parent $cachePath) -Force | Out-Null
+    $previousErrorActionPreference = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        $cloneOutput = @(& git clone --branch $branch --single-branch -- $remote $cachePath 2>&1)
+        $cloneCode = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
+    if ($cloneCode -ne 0) { throw 'Unable to clone central AI context. Check Git authentication/network access.' }
+} else {
+    $actualRemoteRaw = (Invoke-Git -WorkingDirectory $cachePath -Arguments @('remote', 'get-url', 'origin')).Output
+    $actualRemoteIsUrl = $actualRemoteRaw -match '^[a-zA-Z][a-zA-Z0-9+.-]*://'
+    $actualRemote = if ($actualRemoteIsUrl) {
+        $actualRemoteRaw.TrimEnd('/')
+    } else {
+        [System.IO.Path]::GetFullPath($actualRemoteRaw).TrimEnd([char[]]@('\','/'))
+    }
+    if ($actualRemote -ne $remote) {
+        throw 'AI context cache origin does not match the configured central remote.'
+    }
+    $actualBranch = (Invoke-Git -WorkingDirectory $cachePath -Arguments @('rev-parse', '--abbrev-ref', 'HEAD')).Output
+    if ($actualBranch -ne $branch) {
+        throw "AI context cache must remain on configured branch '$branch'."
+    }
+
+    Invoke-Git -WorkingDirectory $cachePath -Arguments @('fetch', 'origin', $branch) | Out-Null
+    $dirty = -not [string]::IsNullOrWhiteSpace((Invoke-Git -WorkingDirectory $cachePath -Arguments @('status', '--porcelain')).Output)
+    if ($dirty) {
+        if ($Action -eq 'checkpoint') {
+            throw 'Automated checkpoint refused because the AI context cache has pre-existing uncommitted changes.'
+        }
+        Write-Warning 'AI context cache is dirty; refresh skipped and local context will be loaded read-only.'
+    } else {
+        $ff = Invoke-Git -WorkingDirectory $cachePath -Arguments @('merge', '--ff-only', "origin/$branch") -AllowFailure
+        if ($ff.ExitCode -ne 0) {
+            if ($Action -eq 'checkpoint') {
+                throw 'AI context cache diverged from origin; automated checkpoint cannot continue safely.'
+            }
+            Write-Warning 'AI context cache diverged from origin; destructive synchronization was refused. Local context will be loaded read-only.'
+        }
+    }
+}
+
+$toolPath = Join-Path $cachePath 'tooling/context-lifecycle.ps1'
+if (-not (Test-Path -LiteralPath $toolPath -PathType Leaf)) {
+    throw 'Central AI context tooling is missing. Refresh the central context repository.'
+}
+
+& $toolPath -Action $Action -RepositoryRoot $repoRoot -ConfigPath $configPath
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

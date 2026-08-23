@@ -89,6 +89,7 @@ def test_security_and_capability_contract() -> None:
     versions = (PAYLOAD / ".ai/tooling/versions.env").read_text(encoding="utf-8")
     requirements_in = PAYLOAD / ".ai/tooling/python/requirements.in"
     requirements_lock = PAYLOAD / ".ai/tooling/python/requirements.lock"
+    gitignore_fragment = (INSTALLER / "fragments/gitignore.txt").read_text(encoding="utf-8")
     allowlist = [
         "get_symbols_overview",
         "find_symbol",
@@ -122,6 +123,8 @@ def test_security_and_capability_contract() -> None:
     assert "RUST_BASE_IMAGE=rust:1.85.0-slim-bookworm@sha256:c842cc0357b91bb15ad2bb89934513d0d226f711fac7f7fedb176d3311714d47" in versions
     assert digest(requirements_in) == "9cf619d2a81e2ff3cc59d211ed7fb2ae14b058ccb362914a08043352d30e5eb0"
     assert digest(requirements_lock) == "df2ef4ae7599178eddeb53f2e1f378dfecfb668411309c6a5a980e330e83bca1"
+    assert ".qbit-toolkit/codex-ai-tooling/backups/" in gitignore_fragment
+    assert ".qbit-toolkit/codex-ai-tooling/transactions/" in gitignore_fragment
 
 
 if __name__ == "__main__":

@@ -14,6 +14,13 @@ function Get-GitIndexSnapshot {
     return $snapshot
 }
 
+function Get-FileSha256([string]$Path) {
+    $stream = [System.IO.File]::Open($Path,[System.IO.FileMode]::Open,[System.IO.FileAccess]::Read,[System.IO.FileShare]::Read)
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    try { return -join ($sha.ComputeHash($stream) | ForEach-Object { $_.ToString('x2') }) }
+    finally { $sha.Dispose(); $stream.Dispose() }
+}
+
 if (-not (Test-Path -LiteralPath (Join-Path $root '.git'))) { throw 'Repository root is not a Git worktree.' }
 if (-not (Get-Command docker -ErrorAction SilentlyContinue)) { throw 'Docker CLI is unavailable.' }
 docker info --format '{{.OSType}}/{{.Architecture}}' | Out-Null
@@ -46,8 +53,8 @@ $required = @(
 foreach ($relative in $required) {
     if (-not (Test-Path -LiteralPath (Join-Path $root $relative) -PathType Leaf)) { throw "Missing build input: $relative" }
 }
-if ((Get-FileHash (Join-Path $root '.ai/tooling/python/requirements.in') -Algorithm SHA256).Hash.ToLowerInvariant() -ne $expectedIn) { throw 'requirements.in hash mismatch.' }
-if ((Get-FileHash (Join-Path $root '.ai/tooling/python/requirements.lock') -Algorithm SHA256).Hash.ToLowerInvariant() -ne $expectedLock) { throw 'requirements.lock hash mismatch.' }
+if ((Get-FileSha256 (Join-Path $root '.ai/tooling/python/requirements.in')) -ne $expectedIn) { throw 'requirements.in hash mismatch.' }
+if ((Get-FileSha256 (Join-Path $root '.ai/tooling/python/requirements.lock')) -ne $expectedLock) { throw 'requirements.lock hash mismatch.' }
 $packageLockPath = Join-Path $root '.ai/tooling/language-servers/package-lock.json'
 $packageLockJson = [IO.File]::ReadAllText(
     $packageLockPath,

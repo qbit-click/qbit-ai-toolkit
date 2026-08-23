@@ -95,7 +95,10 @@ function Get-EffectivePlanItemSha256([object]$PlanItem, [string]$RelativePath = 
 }
 
 function Get-FileSha256([string]$Path) {
-  return (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()
+  $Stream = [System.IO.File]::Open($Path,[System.IO.FileMode]::Open,[System.IO.FileAccess]::Read,[System.IO.FileShare]::Read)
+  $Sha = [System.Security.Cryptography.SHA256]::Create()
+  try { return -join ($Sha.ComputeHash($Stream) | ForEach-Object { $_.ToString('x2') }) }
+  finally { $Sha.Dispose(); $Stream.Dispose() }
 }
 
 function Read-TextFile([string]$Path) {
