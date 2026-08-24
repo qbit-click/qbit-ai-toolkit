@@ -336,7 +336,7 @@ function Read-ValidatedInstallerState([string]$Path) {
     $null = Assert-StateString 'schemaVersion' '1.0'
     $null = Assert-StateString 'installerId' $InstallerId
     $StateInstallerVersion = Assert-StateString 'installerVersion'
-    if ($StateInstallerVersion -cnotin @('1.0.0', $InstallerVersion)) { throw 'installerVersion is invalid.' }
+    if ($StateInstallerVersion -cnotin @('1.0.0', '1.1.0', $InstallerVersion)) { throw 'installerVersion is invalid.' }
     $null = Assert-StateString 'toolkitSchemaVersion' '1.0'
     $Profile = Assert-StateString 'profile'
     if ($Profile -cnotin @('generic', 'typescript', 'rust')) { throw 'profile is invalid.' }
