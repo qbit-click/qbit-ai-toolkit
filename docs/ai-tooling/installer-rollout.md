@@ -21,7 +21,7 @@ AI tooling does not run target-root package-manager commands, create application
 
 ## Context and publication
 
-Member repositories require a configured central context remote and `context.ps1`, `context.py`, and `context.sh`. Context `start` is automatic before substantive work; checkpoint only after a substantive validated milestone. Commit only validated installer/context paths, push only the existing tracked branch, never force-push, and record credential/network failures without undoing validated local work. A `publish: false` laboratory remains local-only.
+Member repositories require a configured central context remote and `context.ps1`, `context.py`, and `context.sh`. Context `start` is automatic before substantive work; checkpoint only after a substantive validated milestone. Commit only validated installer/context paths, push only the existing tracked branch, never force-push, and record credential/network failures without undoing validated local work. If a repository-wide ignore rule matches the installer-owned non-secret `.env.ai.example`, use a force-add for that one example file in the selective publication; never force-add a real environment file. A `publish: false` laboratory remains local-only.
 
 ## Final checklist
 
