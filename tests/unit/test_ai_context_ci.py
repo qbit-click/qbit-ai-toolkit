@@ -18,6 +18,8 @@ class AiContextCiContractTests(unittest.TestCase):
         self.assertIn("macos-latest", self.workflow_text)
         self.assertIn("actions/setup-python@v7", self.workflow_text)
         self.assertIn("python-version: '3.10'", self.workflow_text)
+        self.assertIn("Set up Python 3.11 for repository validation", self.workflow_text)
+        self.assertIn("python-version: '3.11'", self.workflow_text)
         self.assertIn("actions/checkout@v7", self.workflow_text)
 
     def test_required_posix_validation_layers_are_ci_gates(self) -> None:

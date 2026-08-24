@@ -89,6 +89,12 @@ jobs:
         shell: bash
         run: bash installers/ai-context/tests/e2e/test-e2e.sh
 
+      - name: Set up Python 3.11 for repository validation
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.11'
+
       - name: Run repository validation tests
         if: matrix.os == 'ubuntu-latest'
         shell: bash
