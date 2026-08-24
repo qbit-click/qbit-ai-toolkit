@@ -77,7 +77,8 @@ try {
       $Result=[ordered]@{schema_version='1.0';installer_version=$Script:InstallerVersion;operation=$Operation;target=$Root;mode=$EffectiveMode;success=$Success;exit_code=$ExitCode;actions=$ActionText;conflicts=@($Plan.Conflicts);warnings=@()}
     } else {
       if($Plan.Conflicts.Count -gt 0){$ExitCode=4;throw ('Conflicts: ' + ($Plan.Conflicts -join '; '))}
-      if ($null -ne $State -and $Plan.Actions.Count -eq 0) {
+      $NeedsStateRefresh = $null -ne $State -and ([string]$State.installerVersion -cne $Script:InstallerVersion)
+      if ($null -ne $State -and $Plan.Actions.Count -eq 0 -and -not $NeedsStateRefresh) {
         $null=Test-AiContextInstallation $Root
       } else {
         Invoke-AiContextMutation $Root $Spec $State $Plan $EffectiveMode $EffectiveProject $EffectiveRepository $EffectiveRemote $EffectiveBranch

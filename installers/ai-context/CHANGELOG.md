@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.2
+
+- Refresh ownership state when the installed payload is unchanged but the recorded installer version is older.
+- Exclude generated AI context cache and transient `.ai-bridge` runtime files from toolkit repository hygiene validation.
+- Add regression coverage for version-only ownership-state upgrades and runtime-path validator exclusions.
+
 ## 1.0.1
 
 - Add explicit `-MigrateLegacy` support for the pre-installer manual rollout shape.
