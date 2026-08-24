@@ -14,6 +14,9 @@ try{
   Assert ($LASTEXITCODE -eq 0) 'central installer failed'
   &git -C $Central add --all;&git -C $Central -c user.name=Test -c user.email=test@example.invalid commit -q -m 'install context';&git -C $Central push -q -u origin main
   Assert ($LASTEXITCODE -eq 0) 'central context push failed'
+  $CentralTests=Join-Path $Central 'tests/context-lifecycle.tests.ps1'
+  &powershell -NoProfile -ExecutionPolicy Bypass -File $CentralTests
+  Assert ($LASTEXITCODE -eq 0) 'installed central lifecycle regression suite failed'
   $InitialHead=(&git --git-dir $Bare rev-parse refs/heads/main).Trim()
 
   $Member=Join-Path $TempRoot 'member';InitRepo $Member

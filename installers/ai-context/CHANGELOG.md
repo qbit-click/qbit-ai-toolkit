@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.1.0
+
+- Add real Linux/macOS installer parity through Bash entrypoints backed by a Python 3.10+ standard-library engine.
+- Provision both Windows and POSIX member launchers (`context.ps1`, `context.sh`, and `context.py`) and both central lifecycle engines so managed repositories remain portable across supported hosts.
+- Add POSIX start/status/checkpoint behavior with safe cache refresh, dirty/diverged-cache refusal, secret-aware checkpoint validation, scoped context commits, and optional Git push through the normal credential chain.
+- Make managed member lifecycle instructions platform-aware without changing authority or checkpoint semantics.
+- Add POSIX unit, installer integration, legacy migration, installed central lifecycle, end-to-end, and cross-platform ownership-state parity coverage.
+- Reject absolute, traversal, symlink, and reparse-point context cache paths so runtime cache operations remain inside the member repository.
+- Report clean-but-diverged caches as `DIVERGED_LOCAL_CONTEXT` (and behind-only caches as `STALE_LOCAL_CONTEXT`) instead of incorrectly labeling them current.
+
 ## 1.0.2
 
 - Refresh ownership state when the installed payload is unchanged but the recorded installer version is older.

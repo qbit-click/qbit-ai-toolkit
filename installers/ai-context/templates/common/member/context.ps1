@@ -114,10 +114,24 @@ $remote = if ($remoteIsUrl) {
     [System.IO.Path]::GetFullPath((Join-Path $repoRoot $configuredRemote)).TrimEnd([char[]]@('\','/'))
 }
 
-$cachePath = if ([System.IO.Path]::IsPathRooted($cacheRelative)) {
-    [System.IO.Path]::GetFullPath($cacheRelative)
-} else {
-    [System.IO.Path]::GetFullPath((Join-Path $repoRoot $cacheRelative))
+if ([System.IO.Path]::IsPathRooted($cacheRelative)) {
+    throw 'AI context cachePath must be repository-relative.'
+}
+$cachePath = [System.IO.Path]::GetFullPath((Join-Path $repoRoot $cacheRelative))
+$repoPrefix = $repoRoot.TrimEnd([char[]]@([char]92,[char]47)) + [System.IO.Path]::DirectorySeparatorChar
+if (-not (($cachePath + [System.IO.Path]::DirectorySeparatorChar).StartsWith($repoPrefix,[System.StringComparison]::OrdinalIgnoreCase))) {
+    throw 'AI context cachePath must remain inside the member repository.'
+}
+$currentCachePath = $repoRoot
+foreach ($segment in $cacheRelative.Replace([char]92,[char]47).Split('/')) {
+    if ([string]::IsNullOrWhiteSpace($segment) -or $segment -eq '.') { continue }
+    $currentCachePath = Join-Path $currentCachePath $segment
+    if (Test-Path -LiteralPath $currentCachePath) {
+        $item = Get-Item -LiteralPath $currentCachePath -Force
+        if (($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+            throw 'AI context cachePath must not traverse a reparse point.'
+        }
+    }
 }
 
 if (-not (Get-Command git -ErrorAction SilentlyContinue)) {

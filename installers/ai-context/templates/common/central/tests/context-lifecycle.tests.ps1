@@ -267,6 +267,28 @@ $tests += @{ Name = 'start fast-forwards a clean stale context cache'; Run = {
     } finally { Remove-Item -LiteralPath $env.Base -Recurse -Force -ErrorAction SilentlyContinue }
 } }
 
+$tests += @{ Name = 'diverged cache is preserved and reported read-only'; Run = {
+    $env = New-TestEnvironment -Name 'diverged-start'
+    try {
+        Invoke-Launcher -Env $env -Action 'start'
+        Initialize-GitIdentity -Root $env.Cache
+        Set-Content -LiteralPath (Join-Path $env.Cache 'local-ahead.md') -Value 'local commit' -Encoding UTF8
+        Invoke-Git -Root $env.Cache -Arguments @('add', 'local-ahead.md') | Out-Null
+        Invoke-Git -Root $env.Cache -Arguments @('commit', '-m', 'local ahead') | Out-Null
+        $localHead = Invoke-Git -Root $env.Cache -Arguments @('rev-parse', 'HEAD')
+        Set-Content -LiteralPath (Join-Path $env.ContextSeed 'state/current.md') -Value "# Current`nRemote divergent state.`n" -Encoding UTF8
+        Invoke-Git -Root $env.ContextSeed -Arguments @('add', 'state/current.md') | Out-Null
+        Invoke-Git -Root $env.ContextSeed -Arguments @('commit', '-m', 'remote diverge') | Out-Null
+        Invoke-Git -Root $env.ContextSeed -Arguments @('push', 'origin', 'main') | Out-Null
+        Invoke-Launcher -Env $env -Action 'start'
+        $afterHead = Invoke-Git -Root $env.Cache -Arguments @('rev-parse', 'HEAD')
+        Assert-True -Condition ($afterHead -eq $localHead) -Message 'Diverged cache must preserve the local commit.'
+        $runtime = Get-Content -LiteralPath (Join-Path $env.MemberClone '.ai-bridge/context-runtime.json') -Raw | ConvertFrom-Json
+        Assert-True -Condition ($runtime.context.freshness -eq 'DIVERGED_LOCAL_CONTEXT') -Message 'Diverged cache must be reported as DIVERGED_LOCAL_CONTEXT.'
+        Assert-True -Condition ($runtime.context.dirty -eq $false) -Message 'Clean diverged cache should not be mislabeled dirty.'
+    } finally { Remove-Item -LiteralPath $env.Base -Recurse -Force -ErrorAction SilentlyContinue }
+} }
+
 $tests += @{ Name = 'start does not overwrite dirty context cache'; Run = {
     $env = New-TestEnvironment -Name 'dirty-start'
     try {
@@ -323,6 +345,7 @@ $tests += @{ Name = 'checkpoint writes repository scoped artifacts commits and p
     $env = New-TestEnvironment -Name 'checkpoint'
     try {
         Invoke-Launcher -Env $env -Action 'start'
+        Initialize-GitIdentity -Root $env.Cache
         Write-ValidCheckpoint -Env $env
         Invoke-Launcher -Env $env -Action 'checkpoint'
         Assert-True -Condition (-not (Test-Path -LiteralPath $env.Checkpoint)) -Message 'Successful checkpoint must clear replay file.'
@@ -345,6 +368,20 @@ $tests += @{ Name = 'checkpoint refuses pre-existing dirty context work'; Run = 
         Assert-True -Condition ($result.ExitCode -ne 0) -Message 'Dirty cache checkpoint must fail.'
         Assert-True -Condition ($result.Output -like '*pre-existing uncommitted changes*') -Message 'Dirty-cache failure should be explicit.'
         Assert-True -Condition (Test-Path -LiteralPath (Join-Path $env.Cache 'unexpected.txt')) -Message 'Dirty file must not be destroyed.'
+    } finally { Remove-Item -LiteralPath $env.Base -Recurse -Force -ErrorAction SilentlyContinue }
+} }
+
+$tests += @{ Name = 'cache path traversal outside member repository is rejected'; Run = {
+    $env = New-TestEnvironment -Name 'cache-escape'
+    try {
+        $configPath = Join-Path $env.MemberClone '.ai/context/config.json'
+        $config = Get-Content -LiteralPath $configPath -Raw | ConvertFrom-Json
+        $config.context.cachePath = '../../../escaped-cache'
+        $config | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $configPath -Encoding UTF8
+        $result = Invoke-LauncherAllowFailure -Env $env -Action 'start'
+        Assert-True -Condition ($result.ExitCode -ne 0) -Message 'Escaping cachePath must fail.'
+        Assert-True -Condition ($result.Output -like '*cachePath must remain inside the member repository*') -Message 'Escaping cachePath failure should be explicit.'
+        Assert-True -Condition (-not (Test-Path -LiteralPath (Join-Path $env.Base 'escaped-cache'))) -Message 'Escaping cachePath must not create filesystem content outside the member repository.'
     } finally { Remove-Item -LiteralPath $env.Base -Recurse -Force -ErrorAction SilentlyContinue }
 } }
 

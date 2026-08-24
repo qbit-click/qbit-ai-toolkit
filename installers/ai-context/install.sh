@@ -1,4 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
-printf '%s\n' 'installer.ai-context 1.0.2 supports Windows/PowerShell only. POSIX lifecycle parity is not claimed in this version.' >&2
-exit 2
+script_dir=$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)
+if ! command -v python3 >/dev/null 2>&1; then
+  printf '%s\n' 'Python 3.10+ is required for installer.ai-context on POSIX hosts.' >&2
+  exit 2
+fi
+if ! python3 -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 10) else 1)' >/dev/null 2>&1; then
+  printf '%s\n' 'Python 3.10+ is required for installer.ai-context on POSIX hosts.' >&2
+  exit 2
+fi
+exec python3 "$script_dir/lib/installer.py" "$@"

@@ -84,9 +84,26 @@ function Invoke-GitNetwork {
 function Resolve-RepoPath {
     param([string]$Root, [string]$PathValue)
     if ([System.IO.Path]::IsPathRooted($PathValue)) {
-        return [System.IO.Path]::GetFullPath($PathValue)
+        throw 'AI context cachePath must be repository-relative.'
     }
-    return [System.IO.Path]::GetFullPath((Join-Path $Root $PathValue))
+    $rootFull = [System.IO.Path]::GetFullPath($Root).TrimEnd([char[]]@([char]92,[char]47))
+    $resolved = [System.IO.Path]::GetFullPath((Join-Path $rootFull $PathValue))
+    $prefix = $rootFull + [System.IO.Path]::DirectorySeparatorChar
+    if (-not (($resolved + [System.IO.Path]::DirectorySeparatorChar).StartsWith($prefix,[System.StringComparison]::OrdinalIgnoreCase))) {
+        throw 'AI context cachePath must remain inside the member repository.'
+    }
+    $current = $rootFull
+    foreach ($segment in $PathValue.Replace([char]92,[char]47).Split('/')) {
+        if ([string]::IsNullOrWhiteSpace($segment) -or $segment -eq '.') { continue }
+        $current = Join-Path $current $segment
+        if (Test-Path -LiteralPath $current) {
+            $item = Get-Item -LiteralPath $current -Force
+            if (($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+                throw 'AI context cachePath must not traverse a reparse point.'
+            }
+        }
+    }
+    return $resolved
 }
 
 function Get-GitState {
@@ -404,7 +421,15 @@ if ($contextState.branch -ne $expectedBranch) {
     throw "Central context cache must be on branch '$expectedBranch'."
 }
 
-$freshness = if ($contextState.dirty) { 'DIRTY_LOCAL_CONTEXT' } else { 'CURRENT_OR_FETCHED' }
+$freshness = if ($contextState.dirty) {
+    'DIRTY_LOCAL_CONTEXT'
+} elseif ($null -ne $contextState.ahead -and $null -ne $contextState.behind -and $contextState.ahead -gt 0 -and $contextState.behind -gt 0) {
+    'DIVERGED_LOCAL_CONTEXT'
+} elseif ($null -ne $contextState.behind -and $contextState.behind -gt 0) {
+    'STALE_LOCAL_CONTEXT'
+} else {
+    'CURRENT_OR_FETCHED'
+}
 
 if ($Action -eq 'status') {
     $runtime = Write-RuntimeBundle -MemberRoot $memberRootFullPath -ContextRoot $contextRoot -Config $config -ContextFreshness $freshness

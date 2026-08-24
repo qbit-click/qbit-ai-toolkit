@@ -4,7 +4,7 @@ $ErrorActionPreference = 'Stop'
 $Script:InstallerRoot = ([System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))).TrimEnd('\','/')
 $Script:ToolkitRoot = ([System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..\..'))).TrimEnd('\','/')
 $Script:InstallerId = 'installer.ai-context'
-$Script:InstallerVersion = '1.0.2'
+$Script:InstallerVersion = '1.1.0'
 $Script:StatePath = '.qbit/toolkit/installed/ai-context.json'
 $Script:BlockBegin = '<!-- qbit-toolkit:ai-context:start -->'
 $Script:BlockEnd = '<!-- qbit-toolkit:ai-context:end -->'
@@ -252,6 +252,8 @@ function New-Spec([string]$Mode,[hashtable]$Variables) {
   $Blocks['.gitignore'] = [pscustomobject]@{ Begin=$Script:GitignoreBegin; End=$Script:GitignoreEnd; Content=".qbit-toolkit/ai-context/backups/`n.qbit-toolkit/ai-context/transactions/`n" }
   if ($Mode -eq 'member') {
     $Files['.ai/context/context.ps1'] = Read-Template 'templates/common/member/context.ps1'
+    $Files['.ai/context/context.sh'] = Read-Template 'templates/common/member/context.sh'
+    $Files['.ai/context/context.py'] = Read-Template 'templates/common/member/context.py'
     $Files['.ai/context/config.json'] = Render-Template 'templates/common/member/config.json.tpl' $Variables
     $Files['.ai/context/.gitignore'] = Read-Template 'templates/common/member/context.gitignore'
     $Blocks['AGENTS.md'] = [pscustomobject]@{ Begin=$Script:BlockBegin; End=$Script:BlockEnd; Content=(Render-Template 'templates/common/member/agents-block.md.tpl' $Variables) }
@@ -264,8 +266,12 @@ function New-Spec([string]$Mode,[hashtable]$Variables) {
     $LegacyBlocks['.ai-bridge/.gitignore'] = Read-Template 'templates/common/member/bridge.gitignore'
   } else {
     $Files['tooling/context-lifecycle.ps1'] = Read-Template 'templates/common/central/tooling/context-lifecycle.ps1'
+    $Files['tooling/context-lifecycle.py'] = Read-Template 'templates/common/central/tooling/context-lifecycle.py'
     $Files['templates/member/context.ps1'] = Read-Template 'templates/common/member/context.ps1'
+    $Files['templates/member/context.sh'] = Read-Template 'templates/common/member/context.sh'
+    $Files['templates/member/context.py'] = Read-Template 'templates/common/member/context.py'
     $Files['tests/context-lifecycle.tests.ps1'] = Read-Template 'templates/common/central/tests/context-lifecycle.tests.ps1'
+    $Files['tests/context-lifecycle.tests.sh'] = Read-Template 'templates/common/central/tests/context-lifecycle.tests.sh'
     $Files['schemas/checkpoint.schema.json'] = Read-Template 'templates/common/central/schemas/checkpoint.schema.json'
     $Files['docs/context-automation.md'] = Render-Template 'templates/common/central/docs/context-automation.md.tpl' $Variables
     $Blocks['AGENTS.md'] = [pscustomobject]@{ Begin=$Script:BlockBegin; End=$Script:BlockEnd; Content=(Render-Template 'templates/common/central/agents-block.md.tpl' $Variables) }

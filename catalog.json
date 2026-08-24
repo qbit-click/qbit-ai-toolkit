@@ -32,7 +32,7 @@
     {
       "id": "installer.ai-context",
       "kind": "installer",
-      "version": "1.0.2",
+      "version": "1.1.0",
       "path": "installers/ai-context",
       "consumers": [
         "shared"
@@ -41,7 +41,9 @@
       "description": "Installs zero-touch project AI context lifecycle assets for member and central context repositories.",
       "minimumConsumerVersions": {},
       "supportedPlatforms": [
-        "windows"
+        "windows",
+        "linux",
+        "macos"
       ],
       "entrypoints": {
         "powershell": "install.ps1",
