@@ -1,0 +1,100 @@
+name: AI context POSIX validation
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'installers/ai-context/**'
+      - 'catalog.json'
+      - 'tools/validate.py'
+      - 'tests/unit/test_validate.py'
+      - 'tests/unit/test_ai_context_ci.py'
+      - '.github/workflows/ai-context-posix.yml'
+  pull_request:
+    paths:
+      - 'installers/ai-context/**'
+      - 'catalog.json'
+      - 'tools/validate.py'
+      - 'tests/unit/test_validate.py'
+      - 'tests/unit/test_ai_context_ci.py'
+      - '.github/workflows/ai-context-posix.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ai-context-posix-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  posix:
+    name: POSIX (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.10'
+
+      - name: Report toolchain
+        shell: bash
+        run: |
+          bash --version
+          git --version
+          python --version
+
+      - name: Validate shell and Python syntax
+        shell: bash
+        run: |
+          bash -n \
+            installers/ai-context/install.sh \
+            installers/ai-context/verify.sh \
+            installers/ai-context/uninstall.sh \
+            installers/ai-context/templates/common/member/context.sh \
+            installers/ai-context/templates/common/central/tests/context-lifecycle.tests.sh \
+            installers/ai-context/tests/integration/test-installer.sh \
+            installers/ai-context/tests/integration/test-legacy-migration.sh \
+            installers/ai-context/tests/e2e/test-e2e.sh
+          python -m py_compile \
+            installers/ai-context/lib/installer.py \
+            installers/ai-context/templates/common/member/context.py \
+            installers/ai-context/templates/common/central/tooling/context-lifecycle.py \
+            installers/ai-context/tests/unit/test-unit.py
+
+      - name: Run POSIX unit tests
+        shell: bash
+        run: python installers/ai-context/tests/unit/test-unit.py
+
+      - name: Run POSIX installer integration tests
+        shell: bash
+        run: bash installers/ai-context/tests/integration/test-installer.sh
+
+      - name: Run POSIX legacy migration tests
+        shell: bash
+        run: bash installers/ai-context/tests/integration/test-legacy-migration.sh
+
+      - name: Run POSIX end-to-end tests
+        shell: bash
+        run: bash installers/ai-context/tests/e2e/test-e2e.sh
+
+      - name: Run repository validation tests
+        if: matrix.os == 'ubuntu-latest'
+        shell: bash
+        run: python -m unittest tests.unit.test_validate tests.unit.test_ai_context_ci
+
+      - name: Run repository validator
+        if: matrix.os == 'ubuntu-latest'
+        shell: bash
+        run: python tools/validate.py
