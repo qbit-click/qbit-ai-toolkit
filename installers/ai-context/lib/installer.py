@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any
 
 INSTALLER_ID = "installer.ai-context"
-INSTALLER_VERSION = "1.1.1"
+INSTALLER_VERSION = "1.1.2"
 STATE_PATH = ".qbit/toolkit/installed/ai-context.json"
 BLOCK_BEGIN = "<!-- qbit-toolkit:ai-context:start -->"
 BLOCK_END = "<!-- qbit-toolkit:ai-context:end -->"
@@ -126,11 +126,11 @@ def text_hash(text: str) -> str:
 
 
 def file_hash(path: Path) -> str:
-    h = hashlib.sha256()
-    with path.open("rb") as f:
-        for chunk in iter(lambda: f.read(1024 * 1024), b""):
-            h.update(chunk)
-    return h.hexdigest()
+    try:
+        text = path.read_text(encoding="utf-8-sig")
+    except UnicodeDecodeError as exc:
+        raise InstallerError(f"Managed text file is not valid UTF-8: {path}", 5) from exc
+    return text_hash(text)
 
 
 def safe_path(root: Path, relative: str) -> Path:

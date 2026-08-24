@@ -4,7 +4,7 @@ $ErrorActionPreference = 'Stop'
 $Script:InstallerRoot = ([System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))).TrimEnd('\','/')
 $Script:ToolkitRoot = ([System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..\..'))).TrimEnd('\','/')
 $Script:InstallerId = 'installer.ai-context'
-$Script:InstallerVersion = '1.1.1'
+$Script:InstallerVersion = '1.1.2'
 $Script:StatePath = '.qbit/toolkit/installed/ai-context.json'
 $Script:BlockBegin = '<!-- qbit-toolkit:ai-context:start -->'
 $Script:BlockEnd = '<!-- qbit-toolkit:ai-context:end -->'
@@ -68,10 +68,13 @@ function Assert-SafeRemote([string]$Value) {
 }
 
 function Get-FileSha256([string]$Path) {
-  $Stream = [IO.File]::Open($Path,[IO.FileMode]::Open,[IO.FileAccess]::Read,[IO.FileShare]::Read)
-  $Sha = [Security.Cryptography.SHA256]::Create()
-  try { return -join ($Sha.ComputeHash($Stream) | ForEach-Object { $_.ToString('x2') }) }
-  finally { $Sha.Dispose(); $Stream.Dispose() }
+  $Bytes = [IO.File]::ReadAllBytes($Path)
+  $Bom = $Bytes.Length -ge 3 -and $Bytes[0] -eq 0xEF -and $Bytes[1] -eq 0xBB -and $Bytes[2] -eq 0xBF
+  $Offset = if ($Bom) { 3 } else { 0 }
+  $Decoder = New-Object Text.UTF8Encoding($false,$true)
+  try { $Text = $Decoder.GetString($Bytes,$Offset,$Bytes.Length-$Offset) }
+  catch { throw "Managed text file is not valid UTF-8: $Path" }
+  return Get-TextSha256 $Text
 }
 
 function Get-BytesSha256([byte[]]$Bytes) {

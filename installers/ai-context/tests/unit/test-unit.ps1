@@ -23,6 +23,19 @@ Test 'central seeds and managed tooling are separated' {
   $V=Get-Variables 'demo' 'Demo' 'demo-ai-context' 'demo-ai-context' 'https://github.com/example/demo-ai-context.git' 'main';$S=New-Spec 'central' $V
   Assert ($S.Files.ContainsKey('tooling/context-lifecycle.ps1')) 'central tooling not managed';Assert ($S.Seeds.ContainsKey('state/current.md')) 'current state not seeded';Assert (-not $S.Files.ContainsKey('state/current.md')) 'current state incorrectly installer-managed'
 }
+Test 'managed file hash normalizes UTF-8 BOM and line endings' {
+  $Root=Join-Path ([IO.Path]::GetTempPath()) ('ai-context-hash-' + [Guid]::NewGuid().ToString('N'));New-Item -ItemType Directory -Force -Path $Root|Out-Null
+  try {
+    $Lf=Join-Path $Root 'lf.txt';$Crlf=Join-Path $Root 'crlf.txt';$Bom=Join-Path $Root 'bom.txt'
+    [IO.File]::WriteAllText($Lf,"alpha`nbeta`n",[Text.UTF8Encoding]::new($false))
+    [IO.File]::WriteAllText($Crlf,"alpha`r`nbeta`r`n",[Text.UTF8Encoding]::new($false))
+    [IO.File]::WriteAllText($Bom,"alpha`r`nbeta`r`n",[Text.UTF8Encoding]::new($true))
+    $Expected=Get-TextSha256 "alpha`nbeta`n"
+    Assert ((Get-FileSha256 $Lf) -eq $Expected) 'LF hash mismatch'
+    Assert ((Get-FileSha256 $Crlf) -eq $Expected) 'CRLF hash was not normalized'
+    Assert ((Get-FileSha256 $Bom) -eq $Expected) 'UTF-8 BOM was not normalized'
+  } finally {Remove-Item -LiteralPath $Root -Recurse -Force -ErrorAction SilentlyContinue}
+}
 
 if($Failed -gt 0){throw "$Failed unit test(s) failed; $Passed passed."}
 Write-Host "PASS all $Passed AI Context installer unit tests"

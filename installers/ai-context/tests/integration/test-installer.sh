@@ -72,6 +72,21 @@ test_install_verify_idempotent() {
   [[ "$before" == "$after" ]]
 }
 
+test_line_ending_normalization() {
+  local repo launcher
+  repo=$(new_repo member-crlf)
+  set_base_args "$repo"
+  bash "$install" --operation install "${args[@]}" --format json >/dev/null
+  launcher="$repo/.ai/context/context.sh"
+  python3 - "$launcher" <<'PY'
+from pathlib import Path
+import sys
+p=Path(sys.argv[1]); text=p.read_text(encoding='utf-8'); p.write_bytes(text.replace('\n','\r\n').encode('utf-8'))
+PY
+  bash "$verify" --target "$repo" --format json >/dev/null
+  bash "$install" --operation update --target "$repo" --format json >/dev/null
+}
+
 test_unowned_conflict() {
   local repo output code
   repo=$(new_repo unowned-conflict)
@@ -148,6 +163,7 @@ test_central_uninstall_preserves_seed() {
 
 run_test 'member plan is write-free' test_plan_write_free
 run_test 'member install verify and repeated install are idempotent' test_install_verify_idempotent
+run_test 'managed file line-ending normalization does not trigger ownership conflict' test_line_ending_normalization
 run_test 'unowned file conflicts fail closed' test_unowned_conflict
 run_test 'matching generated file requires explicit adoption' test_matching_requires_adoption
 run_test 'modified owned file fails then replace backs up and repairs' test_owned_replace_backup

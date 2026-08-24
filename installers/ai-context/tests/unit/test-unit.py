@@ -59,6 +59,20 @@ class AiContextPosixUnitTests(unittest.TestCase):
             installer.remove_block(path, block)
             self.assertEqual(path.read_bytes(), b"# User rules\n")
 
+    def test_managed_file_hash_normalizes_utf8_bom_and_line_endings(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            lf = root / "lf.txt"
+            crlf = root / "crlf.txt"
+            bom = root / "bom.txt"
+            lf.write_bytes(b"alpha\nbeta\n")
+            crlf.write_bytes(b"alpha\r\nbeta\r\n")
+            bom.write_bytes(b"\xef\xbb\xbfalpha\r\nbeta\r\n")
+            expected = installer.text_hash("alpha\nbeta\n")
+            self.assertEqual(installer.file_hash(lf), expected)
+            self.assertEqual(installer.file_hash(crlf), expected)
+            self.assertEqual(installer.file_hash(bom), expected)
+
     def test_state_identity_is_fail_closed(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp).resolve()

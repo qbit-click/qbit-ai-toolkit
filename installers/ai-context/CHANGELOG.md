@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.2
+
+- Canonicalize UTF-8 managed-file ownership hashes across BOM and LF/CRLF/CR line-ending differences so Git checkout normalization does not create false ownership conflicts.
+- Preserve fail-closed behavior for semantic managed-file modifications while allowing verify/update after line-ending-only checkout changes.
+- Add Windows and POSIX unit/integration regression coverage for cross-platform managed-file hashing.
+
 ## 1.1.1
 
 - Add native Ubuntu/macOS GitHub Actions validation for the POSIX installer lifecycle.

@@ -37,6 +37,13 @@ try{
     $Before=Sha $State;$R2=RunJson @('-Operation','install','-Target',$Repo);Assert ($R2.Code -eq 0 -and $R2.Json.actions.Count -eq 0) 'repeated install was not idempotent';Assert ((Sha $State) -eq $Before) 'idempotent install rewrote state'
   }
 
+  Test 'managed file line-ending normalization does not trigger ownership conflict' {
+    $Repo=NewRepo 'member-crlf';$Base=@('-Mode','member','-Target',$Repo,'-ProjectId','demo','-RepositoryId','demo-api','-ContextRemote','https://github.com/example/demo-ai-context.git');$InstallResult=RunJson (@('-Operation','install')+$Base);Assert ($InstallResult.Code -eq 0) 'install failed'
+    $Launcher=Join-Path $Repo '.ai/context/context.ps1';$Text=ReadUtf8 $Launcher;[IO.File]::WriteAllText($Launcher,$Text.Replace("`n","`r`n"),[Text.UTF8Encoding]::new($false))
+    $VerifyOut=@(& powershell -NoProfile -ExecutionPolicy Bypass -File $Verify -Target $Repo -Format json 2>&1);Assert ($LASTEXITCODE -eq 0) "verify rejected CRLF-only drift: $($VerifyOut-join ' ')"
+    $Update=RunJson @('-Operation','update','-Target',$Repo);Assert ($Update.Code -eq 0) 'update rejected CRLF-only drift'
+  }
+
   Test 'unowned file conflicts fail closed' {
     $Repo=NewRepo 'unowned-conflict';New-Item -ItemType Directory -Force -Path (Join-Path $Repo '.ai/context')|Out-Null;WriteUtf8 (Join-Path $Repo '.ai/context/context.ps1') "custom`n"
     $R=RunJson @('-Operation','plan','-Mode','member','-Target',$Repo,'-ProjectId','demo','-RepositoryId','demo-api','-ContextRemote','https://github.com/example/demo-ai-context.git')
