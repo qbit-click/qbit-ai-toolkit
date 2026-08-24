@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -u
 
-installer_version=1.1.0
+installer_version=1.1.1
 schema_version=1.0
 operation=install
 target=

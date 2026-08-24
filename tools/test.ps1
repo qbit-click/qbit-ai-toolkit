@@ -57,8 +57,10 @@ if ($Layer -in @('unit', 'all')) {
 }
 if ($Layer -in @('integration', 'all')) {
   Invoke-Checked 'PowerShell integration' { & (Join-Path $Root 'installers/codex-ai-tooling/tests/integration/test-installer.ps1') }
+  Invoke-Checked 'Cross-installer composition' { & (Join-Path $Root 'installers/codex-ai-tooling/tests/integration/test-composability.ps1') }
   Write-Host '== POSIX integration =='
   Invoke-PosixIfAvailable 'POSIX integration' (Join-Path $Root 'installers/codex-ai-tooling/tests/integration/test-installer.sh')
+  Invoke-PosixIfAvailable 'POSIX cross-installer composition' (Join-Path $Root 'installers/codex-ai-tooling/tests/integration/test-composability.sh')
 }
 if ($Layer -in @('e2e', 'all')) {
   Invoke-Checked 'PowerShell E2E' { & (Join-Path $Root 'installers/codex-ai-tooling/tests/e2e/test-e2e.ps1') }

@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.1
+
+- Corrects legacy migration authorization: audited historical fingerprints are now coherent and path-specific, so a recognized file cannot authorize replacement of unrelated unowned content.
+- Preserves recognized legacy shared blocks while migrating them transactionally, with state written last and repeat migration remaining idempotent.
+- Restores the project-local Doctor private Serena tmpfs ownership contract required by repository validation.
+
 ## 1.1.0
 
 - Adds explicit `-AdoptMatching` / `--adopt-matching` and `-MigrateLegacy` / `--migrate-legacy` lifecycle options.

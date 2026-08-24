@@ -434,7 +434,7 @@ parse_and_validate_state() {
       if (phase == 0) { if (line != "{") invalid(); phase=1; next }
       if (phase == 1) { if (line != "  \"schemaVersion\": \"1.0\",") invalid(); phase=2; next }
       if (phase == 2) { if (line != "  \"installerId\": \"installer.codex-ai-tooling\",") invalid(); phase=3; next }
-      if (phase == 3) { if (line != "  \"installerVersion\": \"1.0.0\"," && line != "  \"installerVersion\": \"1.1.0\",") invalid(); phase=4; next }
+      if (phase == 3) { if (line != "  \"installerVersion\": \"1.0.0\"," && line != "  \"installerVersion\": \"1.1.0\"," && line != "  \"installerVersion\": \"1.1.1\",") invalid(); phase=4; next }
       if (phase == 4) { if (line != "  \"toolkitSchemaVersion\": \"1.0\",") invalid(); phase=5; next }
       if (phase == 5) {
         if (line !~ /^  "profile": "(generic|typescript|rust)",$/) invalid()

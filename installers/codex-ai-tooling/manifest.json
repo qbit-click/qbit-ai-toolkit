@@ -2,7 +2,7 @@
   "$schema": "../../schemas/installer-manifest.schema.json",
   "id": "installer.codex-ai-tooling",
   "name": "Codex AI Tooling",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "kind": "installer",
   "status": "stable",
   "consumers": [

@@ -2,7 +2,7 @@
 set -eu
 
 installer_id=installer.codex-ai-tooling
-installer_version=1.1.0
+installer_version=1.1.1
 state_path=.qbit/toolkit/installed/codex-ai-tooling.json
 begin_marker='# qbit-toolkit:codex-ai-tooling:start'
 end_marker='# qbit-toolkit:codex-ai-tooling:end'
@@ -171,7 +171,10 @@ if [ -e "$previous_state" ]; then
   fi
   validate_portable_ownership_state "$target_root" "$previous_files" "$previous_blocks" || { echo 'Portable ownership manifest does not match compatibility ownership state.' >&2; exit 1; }
 fi
-recognized_legacy=false
+legacy_variant_path=
+legacy_variant_hash=
+legacy_variant_count=0
+allow_unowned_legacy_blocks=false
 legacy_anchor_matches(){
   legacy_path=$1; shift
   [ -f "$target_root/$legacy_path" ] || return 1
@@ -179,13 +182,34 @@ legacy_anchor_matches(){
   for legacy_expected in "$@"; do [ "$legacy_hash" = "$legacy_expected" ] && return 0; done
   return 1
 }
+select_legacy_variant(){
+  legacy_candidate_path=$1; legacy_candidate_hash=$2
+  if legacy_anchor_matches "$legacy_candidate_path" "$legacy_candidate_hash"; then
+    legacy_variant_count=$((legacy_variant_count+1))
+    legacy_variant_path=$legacy_candidate_path
+    legacy_variant_hash=$legacy_candidate_hash
+  fi
+}
 if [ "$migrate_legacy" = true ] && [ ! -e "$previous_state" ]; then
-  if legacy_anchor_matches .ai/scripts/graphify-build.ps1 f83ce32dd3aafd94a1b4dcefa170141bc93c1332775235b45a192c9c5bccc74d \
-    || legacy_anchor_matches .agents/skills/architecture-impact-analysis/SKILL.md 3441300fe10813a5eaddaef8fcd9c611d25c3190f9157b62b0d180705a0df99b f30d4f56abb56b2be4f09aa4bc65ad0d58a41f825908b6aa67213313309313d1 21f406a21c3f8ce4218c0d34d0dad0f47849dc6e17e01acf65cace0d937fe1c0 \
-    || legacy_anchor_matches .serena/project.yml 37c169cee6a4e44b4073b7de6ecf9a5805f9cfe717dcf1de5e6a25e8e0feff14 b47976f16f34978421d3dcdfea2453911a30984cd5027e8f7577bf9d3d11cdb9; then
-    recognized_legacy=true
-  else
-    echo 'Legacy migration was requested but no recognized historical Serena/Graphify fingerprint was found.' >&2
+  # Audited historical fingerprints are path-specific.  A match never grants
+  # authority to replace a different managed path, and variants cannot mix.
+  select_legacy_variant .ai/scripts/graphify-build.ps1 f83ce32dd3aafd94a1b4dcefa170141bc93c1332775235b45a192c9c5bccc74d
+  select_legacy_variant .agents/skills/architecture-impact-analysis/SKILL.md 3441300fe10813a5eaddaef8fcd9c611d25c3190f9157b62b0d180705a0df99b
+  select_legacy_variant .agents/skills/architecture-impact-analysis/SKILL.md f30d4f56abb56b2be4f09aa4bc65ad0d58a41f825908b6aa67213313309313d1
+  select_legacy_variant .agents/skills/architecture-impact-analysis/SKILL.md 21f406a21c3f8ce4218c0d34d0dad0f47849dc6e17e01acf65cace0d937fe1c0
+  select_legacy_variant .serena/project.yml 37c169cee6a4e44b4073b7de6ecf9a5805f9cfe717dcf1de5e6a25e8e0feff14
+  select_legacy_variant .serena/project.yml b47976f16f34978421d3dcdfea2453911a30984cd5027e8f7577bf9d3d11cdb9
+  [ "$legacy_variant_count" -le 1 ] || { echo 'Legacy migration found incompatible audited payload variants; no files were changed.' >&2; exit 1; }
+  for legacy_block in .gitignore .gitattributes AGENTS.md; do
+    [ -f "$target_root/$legacy_block" ] || continue
+    case "$legacy_block" in
+      AGENTS.md) legacy_begin='<!-- >>> qbit-toolkit:codex-ai-tooling -->'; legacy_end='<!-- <<< qbit-toolkit:codex-ai-tooling -->' ;;
+      *) legacy_begin='# >>> qbit-toolkit:codex-ai-tooling'; legacy_end='# <<< qbit-toolkit:codex-ai-tooling' ;;
+    esac
+    if managed_block_has_valid_block "$target_root/$legacy_block" "$legacy_begin" "$legacy_end"; then allow_unowned_legacy_blocks=true; fi
+  done
+  if [ "$legacy_variant_count" -eq 0 ] && [ "$allow_unowned_legacy_blocks" = false ]; then
+    echo 'Legacy migration was requested but no coherent audited payload fingerprint or managed block was found.' >&2
     exit 1
   fi
 fi
@@ -220,11 +244,17 @@ merge_with_metadata() {
       [ "$(sha_file "$plan_dir/current-block")" = "$mwm_previous_hash" ] || [ "$owned_modified_policy" = replace ] || { echo "Managed block was modified after installation: $mwm_relative" >&2; return 1; }
     }
   elif [ -f "$mwm_target" ] && managed_block_has_valid_block "$mwm_target" "$mwm_legacy_begin" "$mwm_legacy_end"; then
-    [ -n "$mwm_previous_hash" ] || { echo "Unowned legacy managed markers exist in $mwm_relative." >&2; return 1; }
-    managed_block_extract_file "$mwm_target" "$plan_dir/legacy-block" "$mwm_legacy_begin" "$mwm_legacy_end" || return 1
-    [ "$(sha_file "$plan_dir/legacy-block")" = "$mwm_previous_hash" ] || [ "$owned_modified_policy" = replace ] || { echo "Legacy managed block was modified after installation: $mwm_relative" >&2; return 1; }
-    managed_block_remove_file "$mwm_target" "$plan_dir/legacy-removed" "$mwm_legacy_begin" "$mwm_legacy_end" "$mwm_previous_sep" "$([ "$owned_modified_policy" = replace ] && printf true || printf false)" || return 1
-    mwm_source=$plan_dir/legacy-removed
+    if [ -z "$mwm_previous_hash" ]; then
+      [ "$migrate_legacy" = true ] && [ "$allow_unowned_legacy_blocks" = true ] || { echo "Unowned legacy managed markers exist in $mwm_relative." >&2; return 1; }
+      write_managed_block_text "$mwm_fragment" "$plan_dir/legacy-current-block" "$mwm_begin" "$mwm_end"
+      managed_block_replace_file "$mwm_target" "$plan_dir/legacy-current-block" "$plan_dir/legacy-replaced" "$mwm_legacy_begin" "$mwm_legacy_end" || return 1
+      mwm_source=$plan_dir/legacy-replaced
+    else
+      managed_block_extract_file "$mwm_target" "$plan_dir/legacy-block" "$mwm_legacy_begin" "$mwm_legacy_end" || return 1
+      [ "$(sha_file "$plan_dir/legacy-block")" = "$mwm_previous_hash" ] || [ "$owned_modified_policy" = replace ] || { echo "Legacy managed block was modified after installation: $mwm_relative" >&2; return 1; }
+      managed_block_remove_file "$mwm_target" "$plan_dir/legacy-removed" "$mwm_legacy_begin" "$mwm_legacy_end" "$mwm_previous_sep" "$([ "$owned_modified_policy" = replace ] && printf true || printf false)" || return 1
+      mwm_source=$plan_dir/legacy-removed
+    fi
     mwm_migrated=true
   elif [ -n "$mwm_previous_hash" ]; then
     echo "Previously managed block is absent or malformed in $mwm_relative." >&2
@@ -386,7 +416,7 @@ while IFS= read -r rel; do
   if [ -f "$destination" ] && cmp -s "$plan_dir/$rel" "$destination"; then continue; fi
   if [ -f "$destination" ]; then
     prior=$(previous_hash "$rel")
-    if [ -z "$prior" ] && [ "$recognized_legacy" = true ]; then
+    if [ -z "$prior" ] && [ "$rel" = "$legacy_variant_path" ] && [ "$(sha_file "$destination")" = "$legacy_variant_hash" ]; then
       :
     elif [ -z "$prior" ]; then
       echo "Conflict at $rel. Existing content is unowned and differs from the payload." >&2

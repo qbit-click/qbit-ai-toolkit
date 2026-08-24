@@ -600,6 +600,27 @@ Scenario 'Recognized legacy migration is explicit, backed up, and idempotent' {
   $After = Snapshot $Repo; & $Install -Operation install -Target $Repo -Profile generic -MigrateLegacy -SkipBootstrap -SkipDoctor
   Assert ($LASTEXITCODE -eq 0 -and (Snapshot $Repo) -ceq $After) 'Recognized legacy migration was not idempotent.'
 }
+Scenario 'Recognized legacy fingerprint cannot replace custom Codex configuration' {
+  $Repo = New-Repo 'legacy-custom-codex'; $Legacy = Join-Path $Repo '.ai/scripts/graphify-build.ps1'; New-Item -ItemType Directory -Force -Path (Split-Path -Parent $Legacy) | Out-Null
+  [IO.File]::WriteAllText($Legacy,"param([Parameter(Mandatory = `$true)][string]`$Scope)`n`$ErrorActionPreference = 'Stop'`n& (Join-Path `$PSScriptRoot 'graphify-sidecar.ps1') -Action ensure -Scope `$Scope`n",[Text.UTF8Encoding]::new($false))
+  New-Item -ItemType Directory -Force -Path (Join-Path $Repo '.codex') | Out-Null; WriteText (Join-Path $Repo '.codex/config.toml') 'custom = true'; $Before = Snapshot $Repo
+  $Result=Invoke-ExpectNonzeroExit { & $Install -Operation plan -Target $Repo -Profile generic -MigrateLegacy -Format json -NonInteractive 2>$null } 'Legacy fingerprint authorized custom Codex configuration replacement.'; Assert ($Result.ExitCode -eq 4) 'Legacy custom Codex conflict returned the wrong exit code.'
+  Assert ((Snapshot $Repo) -ceq $Before) 'Failed legacy plan changed the target snapshot.'
+}
+Scenario 'Recognized legacy fingerprint cannot replace custom tooling README' {
+  $Repo = New-Repo 'legacy-custom-readme'; $Legacy = Join-Path $Repo '.ai/scripts/graphify-build.ps1'; New-Item -ItemType Directory -Force -Path (Split-Path -Parent $Legacy) | Out-Null
+  [IO.File]::WriteAllText($Legacy,"param([Parameter(Mandatory = `$true)][string]`$Scope)`n`$ErrorActionPreference = 'Stop'`n& (Join-Path `$PSScriptRoot 'graphify-sidecar.ps1') -Action ensure -Scope `$Scope`n",[Text.UTF8Encoding]::new($false))
+  New-Item -ItemType Directory -Force -Path (Join-Path $Repo '.ai/tooling') | Out-Null; WriteText (Join-Path $Repo '.ai/tooling/README.md') 'custom tooling documentation'; $Before = Snapshot $Repo
+  $Result=Invoke-ExpectNonzeroExit { & $Install -Operation plan -Target $Repo -Profile generic -MigrateLegacy -Format json -NonInteractive 2>$null } 'Legacy fingerprint authorized custom tooling README replacement.'; Assert ($Result.ExitCode -eq 4) 'Legacy custom README conflict returned the wrong exit code.'
+  Assert ((Snapshot $Repo) -ceq $Before) 'Failed legacy README plan changed the target snapshot.'
+}
+Scenario 'Recognized partial legacy rejects an unknown managed path' {
+  $Repo = New-Repo 'legacy-unknown-managed'; $Legacy = Join-Path $Repo '.ai/scripts/graphify-build.ps1'; New-Item -ItemType Directory -Force -Path (Split-Path -Parent $Legacy) | Out-Null
+  [IO.File]::WriteAllText($Legacy,"param([Parameter(Mandatory = `$true)][string]`$Scope)`n`$ErrorActionPreference = 'Stop'`n& (Join-Path `$PSScriptRoot 'graphify-sidecar.ps1') -Action ensure -Scope `$Scope`n",[Text.UTF8Encoding]::new($false))
+  WriteText (Join-Path $Repo '.env.ai.example') 'unknown managed-path content'; $Before = Snapshot $Repo
+  $Result=Invoke-ExpectNonzeroExit { & $Install -Operation plan -Target $Repo -Profile generic -MigrateLegacy -Format json -NonInteractive 2>$null } 'Partial legacy migration accepted an unknown managed path.'; Assert ($Result.ExitCode -eq 4) 'Partial legacy conflict returned the wrong exit code.'
+  Assert ((Snapshot $Repo) -ceq $Before) 'Failed partial legacy plan changed the target snapshot.'
+}
 Scenario 'Unknown legacy migration remains write-free and fail-closed' {
   $Repo = New-Repo 'unknown-legacy'; New-Item -ItemType Directory -Force -Path (Join-Path $Repo '.codex') | Out-Null
   WriteText (Join-Path $Repo '.codex/config.toml') 'custom = true'; $Before = Snapshot $Repo

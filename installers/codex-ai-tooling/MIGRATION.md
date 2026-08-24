@@ -2,7 +2,7 @@
 
 Version 1.1 keeps the published installer ID, profiles, entrypoint names, and compatibility ownership-state location. The host entrypoints expose the seven-operation process contract and JSON output. Legacy `--force` is not public; use the narrower owned-modified `replace` policy after reviewing a previously owned conflict.
 
-For a repository with no ownership state, use `plan` first. `--adopt-matching` takes ownership only of exactly matching current payload files. `--migrate-legacy` replaces only audited historical Qbit, Balloot, and Henkel Serena/Graphify payload fingerprints; it writes backups transactionally and continues to reject arbitrary/custom unowned files. Both options are explicit, idempotent, and available as `-AdoptMatching` / `-MigrateLegacy` on PowerShell.
+For a repository with no ownership state, use `plan` first. `--adopt-matching` takes ownership only of exactly matching current payload files. `--migrate-legacy` replaces only the same path when it matches one coherent audited historical Serena/Graphify payload fingerprint, or updates a recognized shared managed block while preserving surrounding content. It writes backups transactionally and continues to reject arbitrary/custom unowned files. Both options are explicit, idempotent, and available as `-AdoptMatching` / `-MigrateLegacy` on PowerShell.
 
 The current payload keeps the validated repository-owned Serena/Graphify architecture while making the published profiles concrete:
 

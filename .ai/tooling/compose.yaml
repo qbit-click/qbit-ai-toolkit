@@ -128,6 +128,8 @@ services:
       - no-new-privileges:true
     tmpfs:
       - /tmp:rw,nosuid,nodev,noexec,mode=1777,size=256m
+      - /serena-state/logs:rw,nosuid,nodev,noexec,mode=0700,uid=10001,gid=10001,size=32m
+      - /serena-state/projects/qbit-ai-toolkit/cache:rw,nosuid,nodev,noexec,mode=0700,uid=10001,gid=10001,size=64m
     working_dir: /workspace
     entrypoint:
       - python
