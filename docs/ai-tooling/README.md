@@ -29,3 +29,4 @@ Generated graphs, logs, caches, reports, and runtime volume contents are derived
 - [Maintenance](./maintenance.md)
 - [Troubleshooting](./troubleshooting.md)
 - [Pinned versions](./versions.md)
+- [Installer rollout and onboarding](./installer-rollout.md)

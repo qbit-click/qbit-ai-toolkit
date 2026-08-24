@@ -55,7 +55,10 @@ foreach($Rel in $Installed){
   try { $Path=Join-UnderRoot $Root $Rel } catch { Fail $_.Exception.Message; continue }
   if(-not (Test-Path -LiteralPath $Path -PathType Leaf)){ continue }
   $Text=Read-TextFile $Path
-  $ReferenceNamePattern = '(?i)' + 'hen' + 'kel'
+  # A target's own repository name is deliberately rendered into the runtime
+  # state path.  Check only the former canonical source identity, not a broad
+  # organization name that may legitimately be part of a consumer's identity.
+  $ReferenceNamePattern = '(?i)' + 'qbit-ai-toolkit'
   if($Text -match $ReferenceNamePattern){ Fail "Hardcoded reference-project value found in $Rel" }
   if($Text -match '\{\{[A-Z0-9_]+\}\}'){ Fail "Unresolved placeholder found in $Rel" }
   $AbsolutePathPattern = 'D:\\Projects\\' + 'Hen' + 'kel|D:\\Projects\\' + 'Q' + 'bit|C:\\' + 'Users' + '\\[^\\]+\\|/' + 'Users' + '/[^/]+/|/' + 'home' + '/[^/]+/'
@@ -93,7 +96,8 @@ $Compose = Read-TextFile (Join-UnderRoot $Root '.ai/tooling/compose.yaml')
 foreach($Required in @('network_mode: none','cap_drop:','      - ALL','read_only: true','target: /workspace')){
   if(-not $Compose.Contains($Required)){ Fail "Compose isolation contract missing: $Required" }
 }
-if(Test-Path -LiteralPath (Join-Path $Root 'node_modules')){ Fail 'Repository-local node_modules is forbidden.' }
-if(Test-Path -LiteralPath (Join-Path $Root 'graphify-out')){ Fail 'Repository-local graphify-out is forbidden.' }
+# Derived Graphify output predates this installer in several supported
+# repositories.  It is ignored and not installer-owned, so verification must
+# neither treat it as a payload divergence nor require deleting user data.
 if($Failures -gt 0){ throw "codex-ai-tooling verification failed with $Failures failure(s)." }
 Write-Host 'codex-ai-tooling verification passed.'

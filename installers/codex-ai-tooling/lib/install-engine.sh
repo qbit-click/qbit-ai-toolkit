@@ -2,7 +2,7 @@
 set -eu
 
 installer_id=installer.codex-ai-tooling
-installer_version=1.0.0
+installer_version=1.1.0
 state_path=.qbit/toolkit/installed/codex-ai-tooling.json
 begin_marker='# qbit-toolkit:codex-ai-tooling:start'
 end_marker='# qbit-toolkit:codex-ai-tooling:end'
@@ -15,10 +15,12 @@ project_display_name=
 allowed_origins=
 dry_run=false
 owned_modified_policy=fail
+adopt_matching=false
+migrate_legacy=false
 skip_bootstrap=false
 skip_doctor=false
 
-usage() { echo 'Usage: install-engine.sh --target <path> [--profile auto|generic|typescript|rust] [--project-slug <slug>] [--project-display-name <name>] [--allowed-origin <origin>]... [--dry-run] [--owned-modified fail|replace] [--skip-bootstrap] [--skip-doctor]' >&2; }
+usage() { echo 'Usage: install-engine.sh --target <path> [--profile auto|generic|typescript|rust] [--project-slug <slug>] [--project-display-name <name>] [--allowed-origin <origin>]... [--dry-run] [--owned-modified fail|replace] [--adopt-matching] [--migrate-legacy] [--skip-bootstrap] [--skip-doctor]' >&2; }
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --target) target=${2:-}; shift 2 ;;
@@ -28,6 +30,8 @@ while [ "$#" -gt 0 ]; do
     --allowed-origin) allowed_origins=${allowed_origins}${allowed_origins:+,}${2:-}; shift 2 ;;
     --dry-run) dry_run=true; shift ;;
     --owned-modified) owned_modified_policy=${2:-}; shift 2 ;;
+    --adopt-matching) adopt_matching=true; shift ;;
+    --migrate-legacy) migrate_legacy=true; shift ;;
     --skip-bootstrap) skip_bootstrap=true; shift ;;
     --skip-doctor) skip_doctor=true; shift ;;
     -h|--help) usage; exit 0 ;;
@@ -167,6 +171,24 @@ if [ -e "$previous_state" ]; then
   fi
   validate_portable_ownership_state "$target_root" "$previous_files" "$previous_blocks" || { echo 'Portable ownership manifest does not match compatibility ownership state.' >&2; exit 1; }
 fi
+recognized_legacy=false
+legacy_anchor_matches(){
+  legacy_path=$1; shift
+  [ -f "$target_root/$legacy_path" ] || return 1
+  legacy_hash=$(sha_file "$target_root/$legacy_path")
+  for legacy_expected in "$@"; do [ "$legacy_hash" = "$legacy_expected" ] && return 0; done
+  return 1
+}
+if [ "$migrate_legacy" = true ] && [ ! -e "$previous_state" ]; then
+  if legacy_anchor_matches .ai/scripts/graphify-build.ps1 f83ce32dd3aafd94a1b4dcefa170141bc93c1332775235b45a192c9c5bccc74d \
+    || legacy_anchor_matches .agents/skills/architecture-impact-analysis/SKILL.md 3441300fe10813a5eaddaef8fcd9c611d25c3190f9157b62b0d180705a0df99b f30d4f56abb56b2be4f09aa4bc65ad0d58a41f825908b6aa67213313309313d1 21f406a21c3f8ce4218c0d34d0dad0f47849dc6e17e01acf65cace0d937fe1c0 \
+    || legacy_anchor_matches .serena/project.yml 37c169cee6a4e44b4073b7de6ecf9a5805f9cfe717dcf1de5e6a25e8e0feff14 b47976f16f34978421d3dcdfea2453911a30984cd5027e8f7577bf9d3d11cdb9; then
+    recognized_legacy=true
+  else
+    echo 'Legacy migration was requested but no recognized historical Serena/Graphify fingerprint was found.' >&2
+    exit 1
+  fi
+fi
 metadata_value(){ awk -F '|' -v key="$1" '$1==key {sub(/^[^|]*\|/,""); print; exit}' "$previous_metadata"; }
 previous_block_value(){ awk -F '|' -v path="$1" -v field="$2" '$1==path {if(field=="hash") print $2; else if(field=="created") print $3; else if(field=="separator") print $4; exit}' "$previous_blocks"; }
 merge_with_metadata() {
@@ -269,7 +291,7 @@ while IFS= read -r rel; do
   [ "$rel" = "$ownership_manifest_rel" ] && continue
   destination=$target_root/$rel
   prior=$(awk -F '|' -v path="$rel" '$1==path {print $2; exit}' "$previous_files")
-  if [ -z "$prior" ] && [ -f "$destination" ] && cmp -s "$plan_dir/$rel" "$destination"; then printf '%s\n' "$rel" >> "$observed_unowned"; fi
+  if [ "$adopt_matching" = false ] && [ -z "$prior" ] && [ -f "$destination" ] && cmp -s "$plan_dir/$rel" "$destination"; then printf '%s\n' "$rel" >> "$observed_unowned"; fi
 done < "$expected_paths"
 owned_expected_paths=$plan_dir/owned-expected-paths
 grep -F -x -v -f "$observed_unowned" "$expected_paths" > "$owned_expected_paths" || true
@@ -364,7 +386,9 @@ while IFS= read -r rel; do
   if [ -f "$destination" ] && cmp -s "$plan_dir/$rel" "$destination"; then continue; fi
   if [ -f "$destination" ]; then
     prior=$(previous_hash "$rel")
-    if [ -z "$prior" ]; then
+    if [ -z "$prior" ] && [ "$recognized_legacy" = true ]; then
+      :
+    elif [ -z "$prior" ]; then
       echo "Conflict at $rel. Existing content is unowned and differs from the payload." >&2
       exit 1
     elif [ "$(sha_file "$destination")" = "$prior" ]; then :

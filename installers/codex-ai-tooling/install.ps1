@@ -7,6 +7,8 @@ param(
   [switch]$NonInteractive,
   [switch]$DryRun,
   [string]$OwnedModified = 'fail',
+  [switch]$AdoptMatching,
+  [switch]$MigrateLegacy,
   [string]$ProjectSlug,
   [string]$ProjectDisplayName,
   [string[]]$AllowedOrigin,
@@ -16,7 +18,7 @@ param(
 
 Set-StrictMode -Version 2
 $ErrorActionPreference = 'Stop'
-$InstallerVersion = '1.0.0'
+$InstallerVersion = '1.1.0'
 $StatePath = '.qbit/toolkit/installed/codex-ai-tooling.json'
 $env:QBIT_TOOLKIT_OPERATION = $Operation
 function Stop-ArgumentError([string]$Message) {
@@ -61,7 +63,7 @@ function Invoke-Captured([scriptblock]$Body) {
 function Get-FailureCode([string]$Message) {
   $text = $Message.ToLowerInvariant()
   if ($text -match 'target.*(does not exist|git work tree|root)|refusing to target') { return 3 }
-  if ($text -match 'conflict at|was modified|managed block.*modified|managed block.*markers?|managed markers|previously managed block|uninstall retained') { return 4 }
+  if ($text -match 'conflict at|was modified|managed block.*modified|managed block.*markers?|managed markers|previously managed block|uninstall retained|no recognized historical') { return 4 }
   if ($text -match 'unsafe|cannot overwrite directory|ownership metadata is invalid|hash mismatch|hash integrity|state.*invalid') { return 5 }
   if ($text -match 'rollback succeeded') { return 6 }
   if ($text -match 'rollback.*(failed|errors)|recovery') { return 7 }
@@ -79,6 +81,8 @@ if ($ProjectSlug) { $EngineArgs.ProjectSlug = $ProjectSlug }
 if ($ProjectDisplayName) { $EngineArgs.ProjectDisplayName = $ProjectDisplayName }
 if ($AllowedOrigin) { $EngineArgs.AllowedOrigins = $AllowedOrigin }
 $EngineArgs.OwnedModifiedPolicy = $OwnedModified
+$EngineArgs.AdoptMatching = $AdoptMatching
+$EngineArgs.MigrateLegacy = $MigrateLegacy
 
 switch ($Operation) {
   'plan' {

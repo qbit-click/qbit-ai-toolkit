@@ -79,7 +79,7 @@ The installer does not treat matching bytes as ownership. Full-file ownership is
 
 Mutating operations classify conflicts before writing, acquire an installer lock, create transaction evidence, back up existing owned content, write non-state content, and publish ownership state last. Failed writes attempt rollback. Incomplete transactions are recovered only from explicit journal and backup evidence.
 
-The compatibility state path remains `.qbit/toolkit/installed/codex-ai-tooling.json`. Portable transaction and recovery evidence remains under `.qbit-toolkit/codex-ai-tooling/` for the 1.0 compatibility contract.
+The compatibility state path remains `.qbit/toolkit/installed/codex-ai-tooling.json`. Portable transaction and recovery evidence remains under `.qbit-toolkit/codex-ai-tooling/` for the 1.1 compatibility contract.
 
 ## Runtime isolation
 

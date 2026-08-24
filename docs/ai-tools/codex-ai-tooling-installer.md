@@ -47,6 +47,10 @@ The target must be an existing Git work tree. For full runtime bootstrap and Doc
 
 The installer itself does not require the target application's package manager to install dependencies.
 
+## Existing and legacy tooling
+
+For an unowned but exact current payload, use `-AdoptMatching` (PowerShell) or `--adopt-matching` (POSIX). For audited historical Serena/Graphify payloads, use `-MigrateLegacy` / `--migrate-legacy`; it is transactional and never overwrites arbitrary custom files. Always run `plan` first. See the [canonical rollout/onboarding runbook](../ai-tooling/installer-rollout.md) for dirty-worktree, context, publication, and final-audit guidance.
+
 ## Start with a plan
 
 A plan is read-only and should normally be the first operation.

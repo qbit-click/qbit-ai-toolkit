@@ -15,7 +15,8 @@ function New-Repo([string]$Name) { $Path = Join-Path $TempRoot $Name; New-Item -
 function Assert([bool]$Condition, [string]$Message) { if (-not $Condition) { throw $Message } }
 function ReadText([string]$Path) { [IO.File]::ReadAllText($Path, [Text.Encoding]::UTF8).Replace("`r`n", "`n") }
 function WriteText([string]$Path, [string]$Text) { [IO.File]::WriteAllText($Path, $Text.Replace("`r`n", "`n"), [Text.UTF8Encoding]::new($false)) }
-function Snapshot([string]$Path) { (Get-ChildItem -LiteralPath $Path -Recurse -File -Force | Where-Object { $_.FullName -notmatch '\\.git\\' } | Sort-Object FullName | ForEach-Object { $_.FullName.Substring($Path.Length).Replace('\','/') + ':' + (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash }) -join "`n" }
+function Get-Sha256([string]$Path) { $Stream=[IO.File]::OpenRead($Path); $Hash=[Security.Cryptography.SHA256]::Create(); try { -join ($Hash.ComputeHash($Stream) | ForEach-Object { $_.ToString('x2') }) } finally { $Hash.Dispose(); $Stream.Dispose() } }
+function Snapshot([string]$Path) { (Get-ChildItem -LiteralPath $Path -Recurse -File -Force | Where-Object { $_.FullName -notmatch '\\.git\\' } | Sort-Object FullName | ForEach-Object { $_.FullName.Substring($Path.Length).Replace('\','/') + ':' + (Get-Sha256 $_.FullName) }) -join "`n" }
 function RunInstall([string]$Repo, [switch]$Replace) { $Policy = if ($Replace) { 'replace' } else { 'fail' }; & $Install -Target $Repo -Profile auto -SkipBootstrap -SkipDoctor -OwnedModified $Policy; if ($LASTEXITCODE -ne 0) { throw 'Installer failed.' } }
 function ExpectFailure([scriptblock]$Block, [string]$Message) { $Thrown = $false; try { & $Block } catch { $Thrown = $true }; if (-not $Thrown) { throw $Message } }
 function Scenario([string]$Name, [scriptblock]$Body) { try { & $Body; $Script:Passed++; Write-Host "PASS $Name" } catch { $Script:Failed++; Write-Host "FAIL $Name :: $($_.Exception.Message)" -ForegroundColor Red } }

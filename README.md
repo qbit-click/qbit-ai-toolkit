@@ -51,7 +51,7 @@ The first stable catalog asset is:
 
 ```text
 installer.codex-ai-tooling
-version: 1.0.0
+version: 1.1.0
 status: stable
 platforms: Windows, Linux, macOS
 ```
@@ -140,7 +140,7 @@ Each catalog asset declares metadata such as:
 - compatibility metadata;
 - optional integrity and release metadata.
 
-The current catalog declares `installer.codex-ai-tooling` as a stable `1.0.0` installer for Windows, Linux, and macOS.
+The current catalog declares `installer.codex-ai-tooling` as a stable `1.1.0` installer for Windows, Linux, and macOS.
 
 Schemas live under [`schemas/`](schemas/) and are part of the versioned contract.
 

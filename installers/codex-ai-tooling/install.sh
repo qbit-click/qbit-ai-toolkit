@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -u
 
-installer_version=1.0.0
+installer_version=1.1.0
 schema_version=1.0
 operation=install
 target=
@@ -9,6 +9,8 @@ profile=auto
 output_format=text
 dry_run=false
 owned_modified=fail
+adopt_matching=false
+migrate_legacy=false
 engine_args=()
 
 json_escape() {
@@ -22,7 +24,7 @@ json_escape() {
 }
 
 usage() {
-  printf '%s\n' 'Usage: install.sh --operation plan|install|update|repair|verify|doctor|uninstall --target PATH [--profile auto|generic|typescript|rust] [--format text|json] [--non-interactive] [--dry-run] [--owned-modified fail|replace]' >&2
+  printf '%s\n' 'Usage: install.sh --operation plan|install|update|repair|verify|doctor|uninstall --target PATH [--profile auto|generic|typescript|rust] [--format text|json] [--non-interactive] [--dry-run] [--owned-modified fail|replace] [--adopt-matching] [--migrate-legacy]' >&2
 }
 
 argument_error() {
@@ -43,6 +45,8 @@ while (($#)); do
     --non-interactive) shift ;;
     --dry-run) dry_run=true; shift ;;
     --owned-modified) (($# >= 2)) || argument_error 'Missing owned-modified value.'; owned_modified=$2; shift 2 ;;
+    --adopt-matching) adopt_matching=true; shift ;;
+    --migrate-legacy) migrate_legacy=true; shift ;;
     --project-slug|--project-display-name|--allowed-origin)
       (($# >= 2)) || argument_error "Missing value for $1."; engine_args+=("$1" "$2"); shift 2 ;;
     --skip-bootstrap|--skip-doctor) shift ;;
@@ -85,7 +89,7 @@ classify_failure() {
   text=$(tr '[:upper:]' '[:lower:]' <"$stderr_file")
   case "$text" in
     *'target directory does not exist'*|*'target must be a git work tree'*|*'target must be the git work tree root'*|*'refusing to target'*) printf 3 ;;
-    *'conflict at'*|*'was modified'*|*'managed block'*'modified'*|*'managed block marker'*|*'managed markers'*|*'previously managed block'*) printf 4 ;;
+    *'conflict at'*|*'was modified'*|*'managed block'*'modified'*|*'managed block marker'*|*'managed markers'*|*'previously managed block'*|*'no recognized historical'*) printf 4 ;;
     *'unsafe'*|*'cannot overwrite directory'*|*'ownership metadata is invalid'*|*'state path is not a regular file'*|*'hash mismatch'*|*'hash integrity'*) printf 5 ;;
     *'rollback succeeded'*) printf 6 ;;
     *'rollback both failed'*|*'rollback had errors'*|*'recovery'*) printf 7 ;;
@@ -102,14 +106,16 @@ state_path=.qbit/toolkit/installed/codex-ai-tooling.json
 [[ -n "$canonical_target" && -f "$canonical_target/$state_path" ]] && detected_state=installed
 
 code=0
+shared_engine_args=(--owned-modified "$owned_modified")
+[[ "$adopt_matching" == true ]] && shared_engine_args+=(--adopt-matching)
+[[ "$migrate_legacy" == true ]] && shared_engine_args+=(--migrate-legacy)
 case "$operation" in
   plan)
-    "$script_dir/lib/install-engine.sh" "${engine_args[@]}" --owned-modified "$owned_modified" --dry-run --skip-bootstrap --skip-doctor >"$stdout_file" 2>"$stderr_file" || code=$?
+    "$script_dir/lib/install-engine.sh" "${engine_args[@]}" "${shared_engine_args[@]}" --dry-run --skip-bootstrap --skip-doctor >"$stdout_file" 2>"$stderr_file" || code=$?
     ;;
   install)
-    extra=()
+    extra=("${shared_engine_args[@]}")
     [[ "$dry_run" == true ]] && extra+=(--dry-run)
-    extra+=(--owned-modified "$owned_modified")
     "$script_dir/lib/install-engine.sh" "${engine_args[@]}" "${extra[@]}" --skip-bootstrap --skip-doctor >"$stdout_file" 2>"$stderr_file" || code=$?
     ;;
   update|repair)
@@ -117,9 +123,8 @@ case "$operation" in
       printf '%s\n' "$operation requires a valid ownership manifest." >"$stderr_file"
       code=5
     else
-      extra=()
+      extra=("${shared_engine_args[@]}")
       [[ "$dry_run" == true ]] && extra+=(--dry-run)
-      extra+=(--owned-modified "$owned_modified")
       "$script_dir/lib/install-engine.sh" "${engine_args[@]}" "${extra[@]}" --skip-bootstrap --skip-doctor >"$stdout_file" 2>"$stderr_file" || code=$?
     fi
     ;;

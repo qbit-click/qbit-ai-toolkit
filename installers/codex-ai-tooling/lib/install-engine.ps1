@@ -7,6 +7,8 @@ param(
   [string[]]$AllowedOrigins,
   [switch]$DryRun,
   [ValidateSet('fail','replace')] [string]$OwnedModifiedPolicy = 'fail',
+  [switch]$AdoptMatching,
+  [switch]$MigrateLegacy,
   [switch]$SkipBootstrap,
   [switch]$SkipDoctor
 )
@@ -90,6 +92,23 @@ if (Test-Path -LiteralPath $StateFullPath -PathType Leaf) {
   $PreviousState = Read-ValidatedInstallerState $StateFullPath
   Assert-PortableOwnershipState $TargetRoot $PreviousState
 }
+function Test-RecognizedLegacyFingerprint([string]$Root) {
+  # These are SHA-256 anchors from the audited pre-1.0 repository-owned
+  # Graphify/Serena payloads.  An arbitrary file merely sharing a managed path
+  # is not sufficient to authorize replacement.
+  $Anchors = @{
+    '.ai/scripts/graphify-build.ps1' = @('f83ce32dd3aafd94a1b4dcefa170141bc93c1332775235b45a192c9c5bccc74d')
+    '.agents/skills/architecture-impact-analysis/SKILL.md' = @('3441300fe10813a5eaddaef8fcd9c611d25c3190f9157b62b0d180705a0df99b','f30d4f56abb56b2be4f09aa4bc65ad0d58a41f825908b6aa67213313309313d1','21f406a21c3f8ce4218c0d34d0dad0f47849dc6e17e01acf65cace0d937fe1c0')
+    '.serena/project.yml' = @('37c169cee6a4e44b4073b7de6ecf9a5805f9cfe717dcf1de5e6a25e8e0feff14','b47976f16f34978421d3dcdfea2453911a30984cd5027e8f7577bf9d3d11cdb9')
+  }
+  foreach ($RelativePath in $Anchors.Keys) {
+    $Path = Join-UnderRoot $Root $RelativePath
+    if ((Test-Path -LiteralPath $Path -PathType Leaf) -and ($Anchors[$RelativePath] -ccontains (Get-FileSha256 $Path))) { return $true }
+  }
+  return $false
+}
+$RecognizedLegacy = $MigrateLegacy -and -not $PreviousState -and (Test-RecognizedLegacyFingerprint $TargetRoot)
+if ($MigrateLegacy -and -not $PreviousState -and -not $RecognizedLegacy) { throw 'Legacy migration was requested but no recognized historical Serena/Graphify fingerprint was found.' }
 $DestinationPaths = @($Plan.Keys) + @('.gitignore','.gitattributes','AGENTS.md',$StatePath)
 if ($PreviousState) {
   $DestinationPaths += @($PreviousState.managedFiles.PSObject.Properties.Name)
@@ -159,7 +178,7 @@ if ($PreviousState) {
 foreach ($RelativePath in @(Sort-QbitPaths @($Plan.Keys))) {
   if ($RelativePath -ceq $PortableManifestPath -or $Plan[$RelativePath].Kind -ne 'file' -or $PreviousOwned.Contains($RelativePath)) { continue }
   $Destination = Join-UnderRoot $TargetRoot $RelativePath
-  if ((Test-Path -LiteralPath $Destination -PathType Leaf) -and (Test-PlanItemContentMatchesFile $Destination $Plan[$RelativePath] $RelativePath)) {
+  if (-not $AdoptMatching -and (Test-Path -LiteralPath $Destination -PathType Leaf) -and (Test-PlanItemContentMatchesFile $Destination $Plan[$RelativePath] $RelativePath)) {
     $Plan[$RelativePath].Kind = 'observed'
   }
 }
@@ -195,10 +214,10 @@ foreach ($RelativePath in (Sort-QbitPaths @($Plan.Keys))) {
   if ($Exists -and (Test-PlanItemContentMatchesFile $Destination $Plan[$RelativePath] $RelativePath)) { continue }
   if ($Exists -and $Plan[$RelativePath].Kind -cnotin @('merge', 'state')) {
     $CurrentHash = Get-FileSha256 $Destination
-    if (-not $PreviousHashes.ContainsKey($RelativePath)) {
+    if (-not $PreviousHashes.ContainsKey($RelativePath) -and -not $RecognizedLegacy) {
       throw "Conflict at $RelativePath. Existing content is unowned and differs from the payload."
     }
-    $WasManaged = $PreviousHashes[$RelativePath] -ceq $CurrentHash -or (Test-PlanItemLogicalTextMatchesFile $Destination $Plan[$RelativePath] $RelativePath)
+    $WasManaged = $RecognizedLegacy -or $PreviousHashes[$RelativePath] -ceq $CurrentHash -or (Test-PlanItemLogicalTextMatchesFile $Destination $Plan[$RelativePath] $RelativePath)
     if (-not $WasManaged -and $OwnedModifiedPolicy -ne 'replace') { throw "Conflict at $RelativePath. Installer-owned content was modified; use OwnedModified replace to back it up and replace it." }
   }
   if ($Exists -and $Plan[$RelativePath].Kind -ceq 'state' -and -not $PreviousState) { throw "Conflict at $RelativePath. Existing state is not recognized." }

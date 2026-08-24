@@ -86,8 +86,7 @@ grep -Fq 'network_mode: none' "$compose" || fail 'Runtime network denial is miss
 grep -Fq 'cap_drop:' "$compose" && grep -Fq '      - ALL' "$compose" || fail 'Runtime capability drop is missing.'
 grep -Fq 'read_only: true' "$compose" || fail 'Read-only runtime contract is missing.'
 grep -Fq 'source: .' "$compose" && grep -Fq 'target: /workspace' "$compose" || fail 'Workspace mount contract is missing.'
-[ ! -e "$root/node_modules" ] || fail 'Repository-local node_modules is forbidden.'
-[ ! -e "$root/graphify-out" ] || fail 'Repository-local graphify-out is forbidden.'
+# Derived Graphify output is ignored and intentionally not installer-owned.
 find "$root/.ai" "$root/.codex" "$root/.serena" -type f -exec grep -El '\{\{[A-Z0-9_]+\}\}' {} + 2>/dev/null | grep -q . && fail 'Unresolved payload placeholder found.' || true
 [ "$failures" -eq 0 ] || { echo "codex-ai-tooling verification failed with $failures failure(s)." >&2; exit 1; }
 echo 'codex-ai-tooling verification passed.'

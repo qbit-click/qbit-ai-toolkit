@@ -32,7 +32,7 @@ Both entrypoints expose the same operations:
 - `doctor`: verify followed by the installed isolated runtime Doctor.
 - `uninstall`: removes only content supported by ownership evidence.
 
-Common options are target, profile (`auto`, `generic`, `typescript`, or `rust`), output format (`text` or `json`), non-interactive mode, dry-run, and owned-modified policy (`fail` or `replace`). `replace` applies only to a previously recorded installer-owned file, makes a backup, and never overrides unowned conflicts. There is no general force option.
+Common options are target, profile (`auto`, `generic`, `typescript`, or `rust`), output format (`text` or `json`), non-interactive mode, dry-run, and owned-modified policy (`fail` or `replace`). `replace` applies only to a previously recorded installer-owned file, makes a backup, and never overrides unowned conflicts. `-AdoptMatching` / `--adopt-matching` explicitly adopts exact current payload files; `-MigrateLegacy` / `--migrate-legacy` replaces only audited historical Serena/Graphify fingerprints transactionally. There is no general force option.
 
 The legacy `verify.ps1`, `verify.sh`, `uninstall.ps1`, and `uninstall.sh` entrypoints remain available, but new integrations should use `install.ps1` or `install.sh` with `operation`.
 
@@ -67,7 +67,7 @@ Tool availability is not permission to invoke every tool on every task.
 
 ## State and safety
 
-The published 1.0 ownership state remains at `.qbit/toolkit/installed/codex-ai-tooling.json` for compatibility. Paths and hashes in this state are authoritative; matching unowned files are not silently adopted. Transaction and recovery evidence is kept under `.qbit-toolkit/codex-ai-tooling/`.
+The published compatibility ownership state remains at `.qbit/toolkit/installed/codex-ai-tooling.json`. Paths and hashes in this state are authoritative; matching unowned files are not silently adopted. Transaction and recovery evidence is kept under `.qbit-toolkit/codex-ai-tooling/`.
 
 Mutations compute conflicts before writing, acquire an installer lock, back up replaced owned content, publish ownership state last, and roll back completed writes after a failure. Plan and verify are read-only. Broad Git reset/clean/stash operations are not part of installer recovery.
 
@@ -82,6 +82,7 @@ See:
 - [release preparation](docs/release.md)
 - [migration notes](MIGRATION.md)
 - public site guide: `docs/ai-tools/codex-ai-tooling-installer.md`
+- [canonical rollout/onboarding runbook](../../docs/ai-tooling/installer-rollout.md)
 
 ## Future Toolkit CLI boundary
 

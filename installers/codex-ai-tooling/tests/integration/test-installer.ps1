@@ -27,7 +27,7 @@ function Snapshot([string]$Path) {
   $Items = Get-ChildItem -LiteralPath $Path -Recurse -Force | Where-Object { $_.FullName -notmatch '\\.git(?:\\|$)' } | Sort-Object FullName
   return ($Items | ForEach-Object {
     $Relative = $_.FullName.Substring($Path.Length).Replace('\','/')
-    if ($_.PSIsContainer) { "d:$Relative" } else { "f:${Relative}:$((Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash)" }
+    if ($_.PSIsContainer) { "d:$Relative" } else { "f:${Relative}:$(Get-FileSha256 $_.FullName)" }
   }) -join "`n"
 }
 function CoreSnapshot([string]$Path) {
@@ -42,7 +42,7 @@ function CoreSnapshot([string]$Path) {
   } | Sort-Object FullName
   return ($Items | ForEach-Object {
     $Relative = $_.FullName.Substring($Path.Length).Replace('\','/')
-    if ($_.PSIsContainer) { "d:$Relative" } else { "f:${Relative}:$((Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash)" }
+    if ($_.PSIsContainer) { "d:$Relative" } else { "f:${Relative}:$(Get-FileSha256 $_.FullName)" }
   }) -join "`n"
 }
 function Get-UninstallBackupCount([string]$Path) {
@@ -569,6 +569,43 @@ Scenario 'Replace policy never overwrites an unmanaged conflict' {
   ExpectFailure { RunInstall $Repo -InstallProfile 'generic' -Replace } 'Replace policy overwrote an unowned conflict.'
   Assert ((Snapshot $Repo) -ceq $Before) 'Replace policy mutated an unowned conflict.'
 }
+Scenario 'Target root node_modules is allowed and untouched' {
+  $Repo = New-Repo 'root-node-modules'
+  $NodeModules = Join-Path $Repo 'node_modules'; New-Item -ItemType Directory -Force -Path $NodeModules | Out-Null
+  $Sentinel = Join-Path $NodeModules 'application-sentinel.txt'; WriteText $Sentinel 'application dependency state'
+  $Before = Get-FileSha256 $Sentinel
+  RunInstall $Repo -InstallProfile typescript
+  & $Verify -Target $Repo; Assert ($LASTEXITCODE -eq 0) 'Verify rejected legitimate root node_modules.'
+  Assert ((Get-FileSha256 $Sentinel) -ceq $Before) 'Installer mutated application node_modules.'
+}
+Scenario 'Explicit matching adoption records matching unowned content as owned' {
+  $Repo = New-Repo 'adopt-matching'
+  Copy-Item -LiteralPath (Join-Path $InstallerRoot 'templates/common/.graphifyignore') -Destination (Join-Path $Repo '.graphifyignore')
+  & $Install -Operation install -Target $Repo -Profile generic -AdoptMatching -SkipBootstrap -SkipDoctor
+  Assert ($LASTEXITCODE -eq 0) 'Explicit matching adoption failed.'
+  $State = Get-Content -Raw (Join-Path $Repo $StatePath) | ConvertFrom-Json
+  Assert ($State.managedFiles.PSObject.Properties.Name -ccontains '.graphifyignore') 'Matching file was not adopted into ownership state.'
+}
+Scenario 'Recognized legacy migration is explicit, backed up, and idempotent' {
+  $Repo = New-Repo 'recognized-legacy'
+  $Legacy = Join-Path $Repo '.ai/scripts/graphify-build.ps1'; New-Item -ItemType Directory -Force -Path (Split-Path -Parent $Legacy) | Out-Null
+  [IO.File]::WriteAllText($Legacy,"param([Parameter(Mandatory = `$true)][string]`$Scope)`n`$ErrorActionPreference = 'Stop'`n& (Join-Path `$PSScriptRoot 'graphify-sidecar.ps1') -Action ensure -Scope `$Scope`n",[Text.UTF8Encoding]::new($false))
+  $Before = Snapshot $Repo
+  $Plan = (& $Install -Operation plan -Target $Repo -Profile generic -MigrateLegacy -Format json -NonInteractive 2>$null) | ConvertFrom-Json
+  Assert ($LASTEXITCODE -eq 0 -and $Plan.success -and (Snapshot $Repo) -ceq $Before) 'Legacy migration plan was not write-free.'
+  & $Install -Operation install -Target $Repo -Profile generic -MigrateLegacy -SkipBootstrap -SkipDoctor
+  Assert ($LASTEXITCODE -eq 0) 'Recognized legacy migration failed.'
+  Assert ((Get-InstallBackupCount $Repo) -ge 1) 'Recognized legacy migration did not retain a backup.'
+  & $Verify -Target $Repo; Assert ($LASTEXITCODE -eq 0) 'Verify failed after recognized legacy migration.'
+  $After = Snapshot $Repo; & $Install -Operation install -Target $Repo -Profile generic -MigrateLegacy -SkipBootstrap -SkipDoctor
+  Assert ($LASTEXITCODE -eq 0 -and (Snapshot $Repo) -ceq $After) 'Recognized legacy migration was not idempotent.'
+}
+Scenario 'Unknown legacy migration remains write-free and fail-closed' {
+  $Repo = New-Repo 'unknown-legacy'; New-Item -ItemType Directory -Force -Path (Join-Path $Repo '.codex') | Out-Null
+  WriteText (Join-Path $Repo '.codex/config.toml') 'custom = true'; $Before = Snapshot $Repo
+  $Result = Invoke-ExpectNonzeroExit { & $Install -Operation plan -Target $Repo -Profile generic -MigrateLegacy -Format json -NonInteractive 2>$null } 'Unknown legacy migration unexpectedly succeeded.'
+  Assert ($Result.ExitCode -eq 4 -and (Snapshot $Repo) -ceq $Before) 'Unknown legacy migration was not fail-closed and write-free.'
+}
 Scenario 'Failed installation restores backup' {
   $Repo = New-Repo 'rollback'
   Set-Content -LiteralPath (Join-Path $Repo '.env.ai.example') -Value 'original' -NoNewline
@@ -618,14 +655,14 @@ Scenario 'PowerShell replace policy backs up and replaces only modified owned AG
   $Suffix = 'suffix trailing  '
   WriteText (Join-Path $Repo 'AGENTS.md') ((ReadText (Join-Path $Repo 'AGENTS.md')) + $Suffix)
   WriteText (Join-Path $Repo 'AGENTS.md') ((ReadText (Join-Path $Repo 'AGENTS.md')) -replace 'Qbit AI tooling', 'Modified owned block')
-  $PriorHash = (Get-FileHash -LiteralPath (Join-Path $Repo 'AGENTS.md') -Algorithm SHA256).Hash
+  $PriorHash = Get-FileSha256 (Join-Path $Repo 'AGENTS.md')
   $BackupRoot = Join-Path $Repo '.qbit-toolkit/codex-ai-tooling/backups'
   $BackupCount = @(Get-ChildItem $BackupRoot -Recurse -File -Filter AGENTS.md).Count
   & $Install -Operation update -Target $Repo -Profile generic -OwnedModified replace -NonInteractive
   Assert ($LASTEXITCODE -eq 0) 'Replace-policy update failed.'
   $Backups = @(Get-ChildItem $BackupRoot -Recurse -File -Filter AGENTS.md)
   Assert ($Backups.Count -eq ($BackupCount + 1)) 'Replace-policy update did not add exactly one AGENTS backup.'
-  Assert (@($Backups | Where-Object { (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash -ceq $PriorHash }).Count -ge 1) 'Complete pre-replacement AGENTS file was not backed up.'
+  Assert (@($Backups | Where-Object { (Get-FileSha256 $_.FullName) -ceq $PriorHash }).Count -ge 1) 'Complete pre-replacement AGENTS file was not backed up.'
   $After = ReadText (Join-Path $Repo 'AGENTS.md')
   Assert ($After.StartsWith($Original, [StringComparison]::Ordinal)) 'Project-owned prefix changed.'
   Assert ($After.EndsWith($Suffix, [StringComparison]::Ordinal)) 'Project-owned suffix changed.'
@@ -1146,7 +1183,7 @@ Scenario 'No source-specific absolute path is written' {
 Scenario 'No reference-project string remains' {
   $Repo = New-Repo 'no-reference-name'
   RunInstall $Repo -InstallProfile 'typescript'
-  $ReferencePattern = 'hen' + 'kel'
+  $ReferencePattern = 'qbit-ai-toolkit'
   $Matches = Get-ChildItem -LiteralPath $Repo -Recurse -File -Force | Where-Object { $_.FullName -notmatch '\\.git\\' } | Select-String -Pattern $ReferencePattern -CaseSensitive:$false
   Assert (-not $Matches) 'Reference-project string found in installed output.'
 }
