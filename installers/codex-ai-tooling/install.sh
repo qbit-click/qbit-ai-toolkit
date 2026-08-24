@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -u
 
-installer_version=1.1.1
+installer_version=1.1.2
 schema_version=1.0
 operation=install
 target=
@@ -89,7 +89,7 @@ classify_failure() {
   text=$(tr '[:upper:]' '[:lower:]' <"$stderr_file")
   case "$text" in
     *'target directory does not exist'*|*'target must be a git work tree'*|*'target must be the git work tree root'*|*'refusing to target'*) printf 3 ;;
-    *'conflict at'*|*'was modified'*|*'managed block'*'modified'*|*'managed block marker'*|*'managed markers'*|*'previously managed block'*|*'no recognized historical'*) printf 4 ;;
+    *'conflict at'*|*'was modified'*|*'managed block'*'modified'*|*'managed block marker'*|*'managed markers'*|*'previously managed block'*|*'no recognized historical'*|*'no coherent audited'*) printf 4 ;;
     *'unsafe'*|*'cannot overwrite directory'*|*'ownership metadata is invalid'*|*'state path is not a regular file'*|*'hash mismatch'*|*'hash integrity'*) printf 5 ;;
     *'rollback succeeded'*) printf 6 ;;
     *'rollback both failed'*|*'rollback had errors'*|*'recovery'*) printf 7 ;;

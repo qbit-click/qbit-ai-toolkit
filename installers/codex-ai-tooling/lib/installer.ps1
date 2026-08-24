@@ -5,7 +5,7 @@ $Script:QbitCodexInstallerRoot = ([System.IO.Path]::GetFullPath((Join-Path $PSSc
 $Script:QbitToolkitRoot = ([System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..\..'))).TrimEnd([System.IO.Path]::DirectorySeparatorChar, [System.IO.Path]::AltDirectorySeparatorChar)
 
 $InstallerId = 'installer.codex-ai-tooling'
-$InstallerVersion = '1.1.1'
+$InstallerVersion = '1.1.2'
 $StatePath = '.qbit/toolkit/installed/codex-ai-tooling.json'
 $BeginMarker = '# qbit-toolkit:codex-ai-tooling:start'
 $EndMarker = '# qbit-toolkit:codex-ai-tooling:end'
@@ -336,7 +336,7 @@ function Read-ValidatedInstallerState([string]$Path) {
     $null = Assert-StateString 'schemaVersion' '1.0'
     $null = Assert-StateString 'installerId' $InstallerId
     $StateInstallerVersion = Assert-StateString 'installerVersion'
-    if ($StateInstallerVersion -cnotin @('1.0.0', '1.1.0', $InstallerVersion)) { throw 'installerVersion is invalid.' }
+    if ($StateInstallerVersion -cnotin @('1.0.0', '1.1.0', '1.1.1', $InstallerVersion)) { throw 'installerVersion is invalid.' }
     $null = Assert-StateString 'toolkitSchemaVersion' '1.0'
     $Profile = Assert-StateString 'profile'
     if ($Profile -cnotin @('generic', 'typescript', 'rust')) { throw 'profile is invalid.' }

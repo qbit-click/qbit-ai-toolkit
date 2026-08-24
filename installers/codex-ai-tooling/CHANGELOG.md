@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.2
+
+- Restores the public process contract for unrecognized legacy migration: PowerShell and POSIX host entrypoints now classify the coherent-fingerprint rejection as conflict exit code 4 rather than generic operation exit code 12.
+- Makes the PowerShell cross-installer composability regression test use the repository's portable SHA-256 pattern instead of depending on `Get-FileHash` availability.
+- Keeps 1.1.1 ownership state upgrade-compatible so existing consumers can update transactionally to 1.1.2.
+
 ## 1.1.1
 
 - Corrects legacy migration authorization: audited historical fingerprints are now coherent and path-specific, so a recognized file cannot authorize replacement of unrelated unowned content.

@@ -18,7 +18,7 @@ param(
 
 Set-StrictMode -Version 2
 $ErrorActionPreference = 'Stop'
-$InstallerVersion = '1.1.1'
+$InstallerVersion = '1.1.2'
 $StatePath = '.qbit/toolkit/installed/codex-ai-tooling.json'
 $env:QBIT_TOOLKIT_OPERATION = $Operation
 function Stop-ArgumentError([string]$Message) {
@@ -63,7 +63,7 @@ function Invoke-Captured([scriptblock]$Body) {
 function Get-FailureCode([string]$Message) {
   $text = $Message.ToLowerInvariant()
   if ($text -match 'target.*(does not exist|git work tree|root)|refusing to target') { return 3 }
-  if ($text -match 'conflict at|was modified|managed block.*modified|managed block.*markers?|managed markers|previously managed block|uninstall retained|no recognized historical') { return 4 }
+  if ($text -match 'conflict at|was modified|managed block.*modified|managed block.*markers?|managed markers|previously managed block|uninstall retained|no recognized historical|no coherent audited') { return 4 }
   if ($text -match 'unsafe|cannot overwrite directory|ownership metadata is invalid|hash mismatch|hash integrity|state.*invalid') { return 5 }
   if ($text -match 'rollback succeeded') { return 6 }
   if ($text -match 'rollback.*(failed|errors)|recovery') { return 7 }

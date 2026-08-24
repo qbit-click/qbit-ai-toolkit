@@ -2,7 +2,7 @@
 set -eu
 
 installer_id=installer.codex-ai-tooling
-installer_version=1.1.1
+installer_version=1.1.2
 state_path=.qbit/toolkit/installed/codex-ai-tooling.json
 begin_marker='# qbit-toolkit:codex-ai-tooling:start'
 end_marker='# qbit-toolkit:codex-ai-tooling:end'
