@@ -63,7 +63,7 @@ EOF
 bash "$member/.ai/context/context.sh" checkpoint >/dev/null
 test ! -e "$member/.ai-bridge/context-checkpoint.json"
 
-git clone "$remote" "$verify_clone" >/dev/null 2>&1
+git clone --branch main --single-branch "$remote" "$verify_clone" >/dev/null 2>&1
 test -f "$verify_clone/state/repositories/demo-member.md"
 test -f "$verify_clone/handoffs/repositories/demo-member.md"
 test -f "$verify_clone/manifests/repositories/demo-member.json"

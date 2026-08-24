@@ -47,6 +47,14 @@ class AiContextCiContractTests(unittest.TestCase):
                 self.assertIn(path, self.workflow_text)
         self.assertIn("permissions:\n  contents: read", self.workflow_text)
 
+    def test_posix_shell_scripts_avoid_bash4_only_array_helpers(self) -> None:
+        shell_files = (REPO_ROOT / "installers" / "ai-context").rglob("*.sh")
+        for path in shell_files:
+            text = path.read_text(encoding="utf-8")
+            with self.subTest(path=path.relative_to(REPO_ROOT).as_posix()):
+                self.assertNotIn("mapfile", text)
+                self.assertNotIn("readarray", text)
+
 
 if __name__ == "__main__":
     unittest.main()

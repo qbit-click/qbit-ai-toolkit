@@ -25,16 +25,33 @@ new_repo() {
   printf '%s\n' "$path"
 }
 
-base_args() {
+args=()
+set_base_args() {
   local repo=$1
-  printf '%s\n' --mode member --target "$repo" --project-id demo --project-display-name Demo --repository-id demo-api --context-remote https://github.com/example/demo-ai-context.git --context-branch main
+  args=(
+    --mode member
+    --target "$repo"
+    --project-id demo
+    --project-display-name Demo
+    --repository-id demo-api
+    --context-remote https://github.com/example/demo-ai-context.git
+    --context-branch main
+  )
+}
+
+sha256_file() {
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum "$1" | awk '{print $1}'
+  else
+    shasum -a 256 "$1" | awk '{print $1}'
+  fi
 }
 
 test_plan_write_free() {
   local repo before after
   repo=$(new_repo plan-member)
   before=$(git -C "$repo" status --porcelain)
-  mapfile -t args < <(base_args "$repo")
+  set_base_args "$repo"
   bash "$install" --operation plan "${args[@]}" --format json >/dev/null
   after=$(git -C "$repo" status --porcelain)
   [[ "$before" == "$after" && ! -e "$repo/.qbit/toolkit/installed/ai-context.json" && ! -e "$repo/.ai/context/context.sh" ]]
@@ -43,15 +60,15 @@ test_plan_write_free() {
 test_install_verify_idempotent() {
   local repo state before after
   repo=$(new_repo member-idempotent)
-  mapfile -t args < <(base_args "$repo")
+  set_base_args "$repo"
   bash "$install" --operation install "${args[@]}" --format json >/dev/null
   state="$repo/.qbit/toolkit/installed/ai-context.json"
   [[ -f "$state" && -f "$repo/.ai/context/context.ps1" && -f "$repo/.ai/context/context.sh" && -f "$repo/.ai/context/context.py" ]]
   bash "$verify" --target "$repo" --format json >/dev/null
-  before=$(sha256sum "$state" | awk '{print $1}')
+  before=$(sha256_file "$state")
   sleep 1
   bash "$install" --operation install --target "$repo" --format json >/dev/null
-  after=$(sha256sum "$state" | awk '{print $1}')
+  after=$(sha256_file "$state")
   [[ "$before" == "$after" ]]
 }
 
@@ -60,7 +77,7 @@ test_unowned_conflict() {
   repo=$(new_repo unowned-conflict)
   mkdir -p "$repo/.ai/context"
   printf 'custom\n' >"$repo/.ai/context/context.sh"
-  mapfile -t args < <(base_args "$repo")
+  set_base_args "$repo"
   set +e
   output=$(bash "$install" --operation plan "${args[@]}" --format json 2>/dev/null)
   code=$?
@@ -73,7 +90,7 @@ test_matching_requires_adoption() {
   repo=$(new_repo adopt-matching)
   mkdir -p "$repo/.ai/context"
   cp "$installer_root/templates/common/member/context.sh" "$repo/.ai/context/context.sh"
-  mapfile -t args < <(base_args "$repo")
+  set_base_args "$repo"
   set +e
   bash "$install" --operation plan "${args[@]}" --format json >/dev/null 2>&1
   code=$?
@@ -85,7 +102,7 @@ test_matching_requires_adoption() {
 test_owned_replace_backup() {
   local repo
   repo=$(new_repo owned-replace)
-  mapfile -t args < <(base_args "$repo")
+  set_base_args "$repo"
   bash "$install" --operation install "${args[@]}" --format json >/dev/null
   printf 'modified\n' >"$repo/.ai/context/context.sh"
   if bash "$install" --operation update --target "$repo" --format json >/dev/null 2>&1; then return 1; fi
@@ -98,7 +115,7 @@ test_uninstall_preserves_project_content() {
   local repo
   repo=$(new_repo uninstall-preserve)
   printf '# User rules\n' >"$repo/AGENTS.md"
-  mapfile -t args < <(base_args "$repo")
+  set_base_args "$repo"
   bash "$install" --operation install "${args[@]}" --format json >/dev/null
   printf '# User-owned bridge docs\n' >"$repo/.ai-bridge/README.md"
   bash "$uninstall" --target "$repo" --format json >/dev/null
@@ -112,9 +129,9 @@ test_central_update_preserves_seed() {
   repo=$(new_repo central-seeds)
   bash "$install" --operation install --mode central --target "$repo" --project-id demo --project-display-name Demo --repository-id demo-ai-context --context-remote https://github.com/example/demo-ai-context.git --context-branch main --format json >/dev/null
   printf '# Current Project AI State\n\nCUSTOM PROJECT CONTENT\n' >"$repo/state/current.md"
-  before=$(sha256sum "$repo/state/current.md" | awk '{print $1}')
+  before=$(sha256_file "$repo/state/current.md")
   bash "$install" --operation update --target "$repo" --format json >/dev/null
-  after=$(sha256sum "$repo/state/current.md" | awk '{print $1}')
+  after=$(sha256_file "$repo/state/current.md")
   [[ "$before" == "$after" ]]
   bash "$verify" --target "$repo" --format json >/dev/null
 }

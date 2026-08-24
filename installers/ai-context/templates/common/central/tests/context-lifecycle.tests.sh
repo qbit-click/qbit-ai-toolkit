@@ -132,7 +132,7 @@ EOF
   bash "$member/.ai/context/context.sh" checkpoint >/dev/null
   [[ ! -e "$member/.ai-bridge/context-checkpoint.json" ]]
   remote_clone="$root/verify"
-  git clone "$root/context.git" "$remote_clone" >/dev/null 2>&1
+  git clone --branch main --single-branch "$root/context.git" "$remote_clone" >/dev/null 2>&1
   assert_file "$remote_clone/state/repositories/test-member.md"
   assert_file "$remote_clone/manifests/repositories/test-member.json"
 }

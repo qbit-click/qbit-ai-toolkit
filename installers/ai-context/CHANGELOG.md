@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.1
+
+- Add native Ubuntu/macOS GitHub Actions validation for the POSIX installer lifecycle.
+- Make POSIX integration fixtures compatible with macOS Bash 3.2 by removing `mapfile` and using portable SHA-256 helpers.
+- Make checkpoint verification clones explicitly target `main` so bare-remote default HEAD differences do not produce false failures on Linux/macOS.
+
 ## 1.1.0
 
 - Add real Linux/macOS installer parity through Bash entrypoints backed by a Python 3.10+ standard-library engine.
