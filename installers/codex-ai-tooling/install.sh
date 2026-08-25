@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -u
 
-installer_version=1.1.2
+installer_version=1.1.3
 schema_version=1.0
 operation=install
 target=
@@ -111,12 +111,12 @@ shared_engine_args=(--owned-modified "$owned_modified")
 [[ "$migrate_legacy" == true ]] && shared_engine_args+=(--migrate-legacy)
 case "$operation" in
   plan)
-    "$script_dir/lib/install-engine.sh" "${engine_args[@]}" "${shared_engine_args[@]}" --dry-run --skip-bootstrap --skip-doctor >"$stdout_file" 2>"$stderr_file" || code=$?
+    bash "$script_dir/lib/install-engine.sh" "${engine_args[@]}" "${shared_engine_args[@]}" --dry-run --skip-bootstrap --skip-doctor >"$stdout_file" 2>"$stderr_file" || code=$?
     ;;
   install)
     extra=("${shared_engine_args[@]}")
     [[ "$dry_run" == true ]] && extra+=(--dry-run)
-    "$script_dir/lib/install-engine.sh" "${engine_args[@]}" "${extra[@]}" --skip-bootstrap --skip-doctor >"$stdout_file" 2>"$stderr_file" || code=$?
+    bash "$script_dir/lib/install-engine.sh" "${engine_args[@]}" "${extra[@]}" --skip-bootstrap --skip-doctor >"$stdout_file" 2>"$stderr_file" || code=$?
     ;;
   update|repair)
     if [[ "$detected_state" != installed ]]; then
@@ -125,14 +125,14 @@ case "$operation" in
     else
       extra=("${shared_engine_args[@]}")
       [[ "$dry_run" == true ]] && extra+=(--dry-run)
-      "$script_dir/lib/install-engine.sh" "${engine_args[@]}" "${extra[@]}" --skip-bootstrap --skip-doctor >"$stdout_file" 2>"$stderr_file" || code=$?
+      bash "$script_dir/lib/install-engine.sh" "${engine_args[@]}" "${extra[@]}" --skip-bootstrap --skip-doctor >"$stdout_file" 2>"$stderr_file" || code=$?
     fi
     ;;
   verify)
-    "$script_dir/verify.sh" --target "$target" >"$stdout_file" 2>"$stderr_file" || code=8
+    sh "$script_dir/verify.sh" --target "$target" >"$stdout_file" 2>"$stderr_file" || code=8
     ;;
   doctor)
-    if "$script_dir/verify.sh" --target "$target" >>"$stdout_file" 2>>"$stderr_file"; then
+    if sh "$script_dir/verify.sh" --target "$target" >>"$stdout_file" 2>>"$stderr_file"; then
       doctor_path=$canonical_target/.ai/scripts/doctor.sh
       if [[ -f "$doctor_path" ]]; then
         bash "$doctor_path" >>"$stdout_file" 2>>"$stderr_file" || code=8
@@ -148,7 +148,7 @@ case "$operation" in
     extra=()
     [[ "$dry_run" == true ]] && extra+=(--dry-run)
     extra+=(--owned-modified "$owned_modified")
-    "$script_dir/uninstall.sh" --target "$target" "${extra[@]}" >"$stdout_file" 2>"$stderr_file" || code=$?
+    sh "$script_dir/uninstall.sh" --target "$target" "${extra[@]}" >"$stdout_file" 2>"$stderr_file" || code=$?
     ;;
 esac
 

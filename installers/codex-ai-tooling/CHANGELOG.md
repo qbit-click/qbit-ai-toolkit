@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.3
+
+- Removes the POSIX top-level lifecycle's dependency on executable mode bits for installer helper scripts by invoking the Bash engine and POSIX verify/uninstall helpers through explicit interpreters.
+- Adds an integration regression that chmods helper scripts to `0644` and proves install, verify, and uninstall still succeed, matching native Linux clones from repositories that track shell files as `100644`.
+- Keeps 1.1.2 ownership state upgrade-compatible so existing consumers can update transactionally to 1.1.3.
+
 ## 1.1.2
 
 - Restores the public process contract for unrecognized legacy migration: PowerShell and POSIX host entrypoints now classify the coherent-fingerprint rejection as conflict exit code 4 rather than generic operation exit code 12.

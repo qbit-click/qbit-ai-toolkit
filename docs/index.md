@@ -20,7 +20,7 @@ future consumers    ─┘
 
 ## Current implemented asset
 
-The first implemented catalog asset is `installer.codex-ai-tooling` version `1.1.2`. It installs repository-owned AI development tooling into an existing Git work tree while preserving application dependencies, project-owned instructions, and Git index state.
+The first implemented catalog asset is `installer.codex-ai-tooling` version `1.1.3`. It installs repository-owned AI development tooling into an existing Git work tree while preserving application dependencies, project-owned instructions, and Git index state.
 
 The installer exposes the lifecycle operations `plan`, `install`, `update`, `repair`, `verify`, `doctor`, and `uninstall` through PowerShell and POSIX entrypoints.
 

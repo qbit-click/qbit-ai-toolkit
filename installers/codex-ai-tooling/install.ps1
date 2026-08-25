@@ -18,7 +18,7 @@ param(
 
 Set-StrictMode -Version 2
 $ErrorActionPreference = 'Stop'
-$InstallerVersion = '1.1.2'
+$InstallerVersion = '1.1.3'
 $StatePath = '.qbit/toolkit/installed/codex-ai-tooling.json'
 $env:QBIT_TOOLKIT_OPERATION = $Operation
 function Stop-ArgumentError([string]$Message) {

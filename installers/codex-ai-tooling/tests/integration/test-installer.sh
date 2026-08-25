@@ -348,6 +348,16 @@ recognized_legacy_custom_conflicts(){ repo=$(new_repo legacy-custom-codex); mkdi
 recognized_legacy_custom_readme_conflicts(){ repo=$(new_repo legacy-custom-readme); mkdir -p "$repo/.ai/scripts" "$repo/.ai/tooling"; printf '%s\n' 'param([Parameter(Mandatory = $true)][string]$Scope)' '$ErrorActionPreference = '\''Stop'\''' '& (Join-Path $PSScriptRoot '\''graphify-sidecar.ps1'\'') -Action ensure -Scope $Scope' > "$repo/.ai/scripts/graphify-build.ps1"; printf 'custom documentation\n' > "$repo/.ai/tooling/README.md"; before=$tmp/legacy-readme-before; after=$tmp/legacy-readme-after; complete_snapshot "$repo" > "$before"; ! bash "$installer_root/install.sh" --operation plan --target "$repo" --profile generic --migrate-legacy --format json --non-interactive >/dev/null 2>&1; complete_snapshot "$repo" > "$after"; cmp -s "$before" "$after"; }
 recognized_partial_unknown_path_conflicts(){ repo=$(new_repo legacy-unknown-path); mkdir -p "$repo/.ai/scripts"; printf '%s\n' 'param([Parameter(Mandatory = $true)][string]$Scope)' '$ErrorActionPreference = '\''Stop'\''' '& (Join-Path $PSScriptRoot '\''graphify-sidecar.ps1'\'') -Action ensure -Scope $Scope' > "$repo/.ai/scripts/graphify-build.ps1"; printf 'unknown managed content\n' > "$repo/.env.ai.example"; before=$tmp/legacy-unknown-before; after=$tmp/legacy-unknown-after; complete_snapshot "$repo" > "$before"; ! bash "$installer_root/install.sh" --operation plan --target "$repo" --profile generic --migrate-legacy --format json --non-interactive >/dev/null 2>&1; complete_snapshot "$repo" > "$after"; cmp -s "$before" "$after"; }
 unknown_legacy_migration_fails(){ repo=$(new_repo unknown-legacy); mkdir -p "$repo/.codex"; printf 'custom = true\n' > "$repo/.codex/config.toml"; before=$tmp/unknown-legacy-before; after=$tmp/unknown-legacy-after; complete_snapshot "$repo" > "$before"; ! bash "$installer_root/install.sh" --operation plan --target "$repo" --profile generic --migrate-legacy --format json --non-interactive >/dev/null 2>&1; complete_snapshot "$repo" > "$after"; cmp -s "$before" "$after"; }
+non_executable_helpers_supported(){
+  portable_root=$tmp/non-executable-installer
+  cp -R "$installer_root" "$portable_root"
+  chmod 0644 "$portable_root/lib/install-engine.sh" "$portable_root/verify.sh" "$portable_root/uninstall.sh"
+  repo=$(new_repo non-executable-helpers)
+  bash "$portable_root/install.sh" --operation install --target "$repo" --profile generic --skip-bootstrap --skip-doctor >/dev/null
+  bash "$portable_root/install.sh" --operation verify --target "$repo" --profile generic >/dev/null
+  bash "$portable_root/install.sh" --operation uninstall --target "$repo" --profile generic >/dev/null
+  [ ! -e "$repo/.qbit/toolkit/installed/codex-ai-tooling.json" ]
+}
 scenario 'fresh generic POSIX install' fresh_generic
 scenario 'fresh rust POSIX install' fresh_rust
 scenario 'auto POSIX detects Rust' auto_rust
@@ -428,6 +438,7 @@ scenario 'POSIX recognized legacy cannot replace custom Codex configuration' rec
 scenario 'POSIX recognized legacy cannot replace custom tooling README' recognized_legacy_custom_readme_conflicts
 scenario 'POSIX recognized partial legacy rejects unknown managed path' recognized_partial_unknown_path_conflicts
 scenario 'POSIX unknown legacy migration is write-free and fail-closed' unknown_legacy_migration_fails
+scenario 'POSIX top-level lifecycle works with non-executable helper scripts' non_executable_helpers_supported
 scenario 'POSIX uninstall ignores undeclared paths' uninstall_ignores_undeclared_paths
 scenario 'Graphify and Playwright not POSIX MCP servers' no_mcp
 echo "RESULT passed=$pass failed=$fail skipped=0"
