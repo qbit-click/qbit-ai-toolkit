@@ -4,14 +4,14 @@ Use the canonical installers from `qbit-ai-toolkit`; never copy their payload fi
 
 ## Order and lifecycle
 
-1. Start the repository's AI context (`.ai/context/context.ps1 start` on Windows or `context.sh start` on POSIX) and read `.ai-bridge/context-runtime.md`.
+1. Start the repository's AI context (`.ai/context/context.ps1 start` on Windows or `bash .ai/context/context.sh start` on POSIX) and read `.ai-bridge/context-runtime.md`.
 2. Snapshot Git status and dirty paths. Preserve project edits and never stage, reset, or stash them.
 3. Run `installer.codex-ai-tooling plan`.
 4. Use `install` for a fresh repository, `update` for valid ownership state, `--adopt-matching` / `-AdoptMatching` for exact current unowned content, or `--migrate-legacy` / `-MigrateLegacy` for a recognized historical Serena/Graphify installation. Unknown unowned content remains a conflict.
 5. Run tooling `verify`, then installed `bootstrap` and `doctor` when Docker is available. Re-run `plan` and `verify` after repair or update.
 6. Install or update `installer.ai-context`, then verify both installers. Each managed block in `AGENTS.md`, `.gitignore`, and `.gitattributes` must occur once and preserve project content outside it.
 
-PowerShell and POSIX use the same lifecycle and exit-code contract. Always use `plan` before mutation and `--format json` for automation.
+PowerShell and POSIX use the same lifecycle and exit-code contract. Invoke POSIX shell entrypoints explicitly through `bash` (for example, `bash installers/codex-ai-tooling/install.sh ...`) so operation does not depend on repository executable mode bits. Always use `plan` before mutation and `--format json` for automation.
 
 ## Legacy and dirty repositories
 
