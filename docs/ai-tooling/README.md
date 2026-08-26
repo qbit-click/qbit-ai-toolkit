@@ -23,6 +23,7 @@ Generated graphs, logs, caches, reports, and runtime volume contents are derived
 
 ## Documentation
 
+- [AI Context Continuity v2](./continuity-v2.md)
 - [Architecture and ownership](./architecture.md)
 - [Project-local versus installer ownership](./project-local-vs-installer.md)
 - [Onboarding](./onboarding.md)

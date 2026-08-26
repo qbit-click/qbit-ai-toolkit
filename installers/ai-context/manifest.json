@@ -2,7 +2,7 @@
   "$schema": "../../schemas/installer-manifest.schema.json",
   "id": "installer.ai-context",
   "name": "AI Context Lifecycle",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "kind": "installer",
   "status": "stable",
   "consumers": [

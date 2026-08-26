@@ -370,6 +370,112 @@ def validate_installer_policies() -> None:
             error("Rust profile Dockerfile must install rust-analyzer for the pinned rustup toolchain")
 
 
+def validate_ai_context_continuity_v2() -> None:
+    installer = ROOT / "installers" / "ai-context"
+    required_paths = {
+        "version": installer / "VERSION",
+        "readme": installer / "README.md",
+        "changelog": installer / "CHANGELOG.md",
+        "member_agents": installer / "templates" / "common" / "member" / "agents-block.md.tpl",
+        "member_ps": installer / "templates" / "common" / "member" / "context.ps1",
+        "member_py": installer / "templates" / "common" / "member" / "context.py",
+        "member_sh": installer / "templates" / "common" / "member" / "context.sh",
+        "member_transfer": installer / "templates" / "common" / "member" / "context-transfer.ps1",
+        "central_docs": installer / "templates" / "common" / "central" / "docs" / "context-automation.md.tpl",
+        "checkpoint_schema": installer / "templates" / "common" / "central" / "schemas" / "checkpoint.schema.json",
+        "continuity_ps": installer / "templates" / "common" / "central" / "tooling" / "context-continuity.ps1",
+        "continuity_py": installer / "templates" / "common" / "central" / "tooling" / "context-lifecycle.py",
+        "root_agents": ROOT / "AGENTS.md",
+        "root_context": ROOT / "AI_CONTEXT.md",
+        "root_ps": ROOT / ".ai" / "context" / "context.ps1",
+        "root_py": ROOT / ".ai" / "context" / "context.py",
+        "root_sh": ROOT / ".ai" / "context" / "context.sh",
+        "root_transfer": ROOT / ".ai" / "context" / "context-transfer.ps1",
+        "canonical_docs": ROOT / "docs" / "ai-tooling" / "continuity-v2.md",
+    }
+    missing = [rel(path) for path in required_paths.values() if not path.exists()]
+    if missing:
+        for name in missing:
+            error(f"Continuity v2 contract file is missing: {name}")
+        return
+
+    version = read_text(required_paths["version"]).strip()
+    readme = read_text(required_paths["readme"])
+    changelog = read_text(required_paths["changelog"])
+    root_agents = read_text(required_paths["root_agents"])
+    root_context = read_text(required_paths["root_context"])
+    member_agents = read_text(required_paths["member_agents"])
+    member_ps = read_text(required_paths["member_ps"])
+    member_py = read_text(required_paths["member_py"])
+    central_docs = read_text(required_paths["central_docs"])
+    canonical_docs = read_text(required_paths["canonical_docs"])
+    checkpoint_schema = json.loads(read_text(required_paths["checkpoint_schema"]))
+    continuity_ps = read_text(required_paths["continuity_ps"])
+    continuity_py = read_text(required_paths["continuity_py"])
+
+    for root_key, template_key in (
+        ("root_ps", "member_ps"),
+        ("root_py", "member_py"),
+        ("root_sh", "member_sh"),
+        ("root_transfer", "member_transfer"),
+    ):
+        if required_paths[root_key].read_bytes() != required_paths[template_key].read_bytes():
+            error(f"Toolkit root AI Context runtime drifted from canonical template: {rel(required_paths[root_key])}")
+
+    if f"current stable release is `{version}`" not in readme:
+        error("AI Context README stable release does not match VERSION")
+    if f"## {version}" not in changelog:
+        error("AI Context changelog is missing the current VERSION section")
+    if f"current stable release is `{version}`" not in canonical_docs:
+        error("Continuity v2 canonical docs stable release does not match VERSION")
+
+    required_policy_tokens = (
+        "`schemaVersion: 2`",
+        "`continuity.mode: tracked`",
+        "`continuity.mode: snapshot`",
+        "`continuity.validationLedger[]`",
+        "`export`, `import`, and `reconnect`",
+    )
+    for token in required_policy_tokens:
+        if token not in root_agents:
+            error(f"Toolkit AGENTS Continuity v2 policy missing: {token}")
+        if token not in member_agents:
+            error(f"Managed member AGENTS Continuity v2 policy missing: {token}")
+    if "checkpoint JSON must use `schemaVersion: 1`" in root_agents:
+        error("Toolkit AGENTS still requires legacy checkpoint schemaVersion 1")
+    for token in ("Continuity v2 (`schemaVersion: 2`)", "tracked workstream", "worktree fingerprint", "`export`, `import`, and `reconnect`"):
+        if token not in root_context:
+            error(f"Toolkit AI_CONTEXT Continuity v2 entry point missing: {token}")
+
+    for token in (
+        "`nextAction` is a pointer into durable structured work",
+        "Several files use a field named `schemaVersion`, but they are independent contracts",
+        "silent disappearance of unresolved work-item IDs",
+        "OFFLINE_IMPORTED_CONTEXT",
+        "Reconnect never auto-merges, rebases, resets, or force-pushes",
+    ):
+        if token not in canonical_docs:
+            error(f"Continuity v2 canonical docs contract missing: {token}")
+
+    for token in ("## Continuity v2", "schemaVersion: 2", "workstreams/archive/", "validation/repositories/", "## Offline portability"):
+        if token not in central_docs:
+            error(f"Generated central Continuity v2 documentation missing: {token}")
+
+    ps_actions = "[ValidateSet('start', 'status', 'checkpoint', 'export', 'import', 'reconnect')]"
+    if ps_actions not in member_ps:
+        error("PowerShell member launcher Continuity v2 action surface is incomplete")
+    py_actions = '{"start", "status", "checkpoint", "export", "import", "reconnect"}'
+    if py_actions not in member_py:
+        error("Python/POSIX member launcher Continuity v2 action surface is incomplete")
+
+    schema_versions = checkpoint_schema.get("properties", {}).get("schemaVersion", {}).get("enum", [])
+    if set(schema_versions) != {1, 2}:
+        error("Checkpoint schema must accept legacy v1 and Continuity v2 only")
+    for token in ("schemaVersion 1 checkpoints must not include continuity", "schemaVersion 2 checkpoint requires continuity object"):
+        if token not in continuity_ps or token not in continuity_py:
+            error(f"Central lifecycle checkpoint compatibility contract missing: {token}")
+
+
 def check_tool_array(text: str, server: str, expected: list[str], path: Path) -> None:
     match = re.search(rf"(?ms)\[mcp_servers\.{server}\].*?enabled_tools\s*=\s*\[(.*?)\]", text)
     if not match:
@@ -1143,12 +1249,14 @@ def main() -> int:
         print("usage: validate.py [--focus ai-tooling]", file=sys.stderr)
         return 2
     if focused:
+        validate_ai_context_continuity_v2()
         validate_ai_tooling()
     else:
         parse_json_files()
         validate_catalog()
         validate_content_hygiene()
         validate_installer_policies()
+        validate_ai_context_continuity_v2()
         validate_ai_tooling()
     if errors:
         for item in errors:

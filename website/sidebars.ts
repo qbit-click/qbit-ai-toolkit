@@ -92,6 +92,7 @@ const sidebars: SidebarsConfig = {
       label: 'Repository tooling',
       items: [
         'ai-tooling/README',
+        'ai-tooling/continuity-v2',
         'ai-tooling/onboarding',
         'ai-tooling/project-local-vs-installer',
         'ai-tooling/maintenance',

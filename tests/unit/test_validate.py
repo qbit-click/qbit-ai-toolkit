@@ -98,6 +98,33 @@ class ValidateUnitTests(unittest.TestCase):
         for file in ("catalog.json",):
             shutil.copy2(REPO_ROOT / file, self.root / file)
 
+    def copy_continuity_fixture(self) -> None:
+        for relative in (
+            "AGENTS.md",
+            "AI_CONTEXT.md",
+            ".ai/context/context.ps1",
+            ".ai/context/context.py",
+            ".ai/context/context.sh",
+            ".ai/context/context-transfer.ps1",
+            "docs/ai-tooling/continuity-v2.md",
+            "installers/ai-context/VERSION",
+            "installers/ai-context/README.md",
+            "installers/ai-context/CHANGELOG.md",
+            "installers/ai-context/templates/common/member/agents-block.md.tpl",
+            "installers/ai-context/templates/common/member/context.ps1",
+            "installers/ai-context/templates/common/member/context.py",
+            "installers/ai-context/templates/common/member/context.sh",
+            "installers/ai-context/templates/common/member/context-transfer.ps1",
+            "installers/ai-context/templates/common/central/docs/context-automation.md.tpl",
+            "installers/ai-context/templates/common/central/schemas/checkpoint.schema.json",
+            "installers/ai-context/templates/common/central/tooling/context-continuity.ps1",
+            "installers/ai-context/templates/common/central/tooling/context-lifecycle.py",
+        ):
+            source = REPO_ROOT / relative
+            target = self.root / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, target)
+
     def assert_ai_mutation(self, relative: str, mutate, expected: str) -> None:
         self.copy_ai_fixture()
         path = self.root / relative
@@ -157,6 +184,34 @@ class ValidateUnitTests(unittest.TestCase):
         write_text(catalog_path, json.dumps(catalog) + "\n")
         validate.validate_catalog()
         self.assertFalse(any("rust supported profile" in item for item in validate.errors), validate.errors)
+
+    def test_continuity_v2_contract_accepts_canonical_fixture(self) -> None:
+        self.copy_continuity_fixture()
+        validate.validate_ai_context_continuity_v2()
+        self.assertEqual([], validate.errors)
+
+    def test_continuity_v2_contract_rejects_toolkit_schema_v1_policy_drift(self) -> None:
+        self.copy_continuity_fixture()
+        path = self.root / "AGENTS.md"
+        text = path.read_text(encoding="utf-8").replace("`schemaVersion: 2`", "`schemaVersion: 1`", 1)
+        write_text(path, text)
+        validate.validate_ai_context_continuity_v2()
+        self.assertTrue(any("Toolkit AGENTS Continuity v2 policy missing" in item for item in validate.errors), validate.errors)
+
+    def test_continuity_v2_contract_rejects_incomplete_member_action_surface(self) -> None:
+        self.copy_continuity_fixture()
+        path = self.root / "installers" / "ai-context" / "templates" / "common" / "member" / "context.ps1"
+        text = path.read_text(encoding="utf-8").replace(", 'reconnect'", "", 1)
+        write_text(path, text)
+        validate.validate_ai_context_continuity_v2()
+        self.assertTrue(any("PowerShell member launcher Continuity v2 action surface is incomplete" in item for item in validate.errors), validate.errors)
+
+    def test_continuity_v2_contract_rejects_toolkit_root_runtime_drift(self) -> None:
+        self.copy_continuity_fixture()
+        path = self.root / ".ai" / "context" / "context.ps1"
+        write_text(path, path.read_text(encoding="utf-8") + "# drift\n")
+        validate.validate_ai_context_continuity_v2()
+        self.assertTrue(any("Toolkit root AI Context runtime drifted from canonical template" in item for item in validate.errors), validate.errors)
 
     def test_all_files_excludes_ai_context_runtime_artifacts(self) -> None:
         write_text(self.root / ".ai" / "context" / "cache" / "project-context" / "runtime.json", "{}\n")

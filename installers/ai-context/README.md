@@ -1,6 +1,6 @@
 # AI Context Lifecycle installer
 
-`installer.ai-context` installs the zero-touch AI context lifecycle as a versioned toolkit asset. Version 1.1 supports Windows, Linux, and macOS in two modes:
+`installer.ai-context` installs the zero-touch AI context lifecycle as a versioned toolkit asset. The current stable release is `1.2.2`; Continuity v2 is supported on Windows, Linux, and macOS in two modes:
 
 - `member`: installs repository launchers/config plus managed lifecycle blocks in `AGENTS.md`, `AI_CONTEXT.md`, `.gitignore`, and `.ai-bridge/.gitignore`.
 - `central`: installs the canonical lifecycle engines, member launcher templates, checkpoint schema, regression suites, and automation documentation. It seeds project continuity files only when absent; seeded continuity becomes project-owned immediately and is never overwritten or removed by installer update/uninstall.
@@ -13,6 +13,8 @@ The installer never runs application dependency installation and never performs 
 - Linux/macOS: Bash, Git, and Python 3.10+ from the host environment.
 
 Both Windows and POSIX launchers/tooling are provisioned by either installer host so a managed repository remains portable after cloning on another supported platform.
+
+The canonical architecture and operating contract for Continuity v2 is documented in [`../../docs/ai-tooling/continuity-v2.md`](../../docs/ai-tooling/continuity-v2.md). Checkpoint schema versions, member config schema versions, and offline-transfer manifest schema versions are independent namespaces: Continuity v2 means substantive checkpoints use checkpoint `schemaVersion: 2`; member config and transfer manifest formats intentionally remain at their own schema version `1` until those formats change.
 
 ## Member install
 

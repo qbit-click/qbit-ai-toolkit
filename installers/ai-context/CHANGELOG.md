@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.2.2
+
+- Align the toolkit's own agent/checkpoint policy and canonical documentation with Continuity v2 so new substantive checkpoints use schema v2 tracked continuity instead of the legacy schema v1 compatibility path.
+- Synchronize the toolkit's repository-local Windows/POSIX context launchers with the canonical member runtime, including `export`, `import`, `reconnect`, cache path hardening, and offline continuation behavior.
+- Add a first-class Continuity v2 architecture/operations guide, explicitly distinguish checkpoint schema v2 from the independent member-config and transfer-manifest schema v1 namespaces, and make the installer README report the current release correctly.
+- Add repository validation coverage that fails when Continuity v2 policy, documentation, root runtime scripts, managed runtime action surfaces, or installer version references drift out of sync.
+
 ## 1.2.1
 
 - Fix offline export on real installed central-context repositories by keeping canonical secret-rejection fixtures semantically equivalent while avoiding literal secret-like tokens in the tracked test source itself.

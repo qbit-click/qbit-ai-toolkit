@@ -45,18 +45,17 @@ Qbit AI Toolkit is not:
 
 Product repositories consume Toolkit assets through explicit versioned contracts.
 
-## Current stable asset
+## Current stable assets
 
-The first stable catalog asset is:
+The catalog currently publishes two stable installers:
 
 ```text
-installer.codex-ai-tooling
-version: 1.1.0
-status: stable
-platforms: Windows, Linux, macOS
+installer.codex-ai-tooling  1.1.3
+installer.ai-context        1.2.2
+platforms                   Windows, Linux, macOS
 ```
 
-It installs repository-owned AI development tooling into an existing Git work tree while preserving application dependencies, project-owned instructions, and Git index state.
+`installer.codex-ai-tooling` installs repository-owned AI development tooling into an existing Git work tree while preserving application dependencies, project-owned instructions, and Git index state. `installer.ai-context` installs the zero-touch AI Context lifecycle; its current Continuity v2 contract is documented in [`docs/ai-tooling/continuity-v2.md`](docs/ai-tooling/continuity-v2.md).
 
 The installer exposes the lifecycle operations:
 
@@ -140,7 +139,7 @@ Each catalog asset declares metadata such as:
 - compatibility metadata;
 - optional integrity and release metadata.
 
-The current catalog declares `installer.codex-ai-tooling` as a stable `1.1.0` installer for Windows, Linux, and macOS.
+The current catalog declares `installer.codex-ai-tooling` `1.1.3` and `installer.ai-context` `1.2.2` as stable installers for Windows, Linux, and macOS.
 
 Schemas live under [`schemas/`](schemas/) and are part of the versioned contract.
 

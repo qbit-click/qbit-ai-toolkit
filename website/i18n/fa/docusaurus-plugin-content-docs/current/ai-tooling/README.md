@@ -23,6 +23,7 @@ graph، log، cache، report و state volumeهای runtime فقط derived eviden
 
 ## ادامه مطالعه
 
+- [AI Context Continuity v2](./continuity-v2.md)
 - [معماری و مالکیت](./architecture.md)
 - [تفکیک project-local و installer](./project-local-vs-installer.md)
 - [راه‌اندازی](./onboarding.md)
