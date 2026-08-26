@@ -3,7 +3,9 @@ $ErrorActionPreference = 'Stop'
 
 $repoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $templateLauncher = Join-Path $repoRoot 'templates/member/context.ps1'
+$templateTransferHelper = Join-Path $repoRoot 'templates/member/context-transfer.ps1'
 $centralTool = Join-Path $repoRoot 'tooling/context-lifecycle.ps1'
+$centralContinuityTool = Join-Path $repoRoot 'tooling/context-continuity.ps1'
 
 function Invoke-Git {
     param([string]$Root, [string[]]$Arguments)
@@ -81,6 +83,7 @@ function New-TestEnvironment {
     }
     New-Item -ItemType Directory -Path (Join-Path $contextSeed 'tooling') -Force | Out-Null
     Copy-Item -LiteralPath $centralTool -Destination (Join-Path $contextSeed 'tooling/context-lifecycle.ps1')
+    Copy-Item -LiteralPath $centralContinuityTool -Destination (Join-Path $contextSeed 'tooling/context-continuity.ps1')
     Invoke-Git -Root $contextSeed -Arguments @('add', '--all') | Out-Null
     Invoke-Git -Root $contextSeed -Arguments @('commit', '-m', 'seed context') | Out-Null
     Invoke-Git -Root $contextSeed -Arguments @('remote', 'add', 'origin', $contextBare) | Out-Null
@@ -95,6 +98,7 @@ function New-TestEnvironment {
     $contextDir = Join-Path $memberSeed '.ai/context'
     New-Item -ItemType Directory -Path $contextDir -Force | Out-Null
     Copy-Item -LiteralPath $templateLauncher -Destination (Join-Path $contextDir 'context.ps1')
+    Copy-Item -LiteralPath $templateTransferHelper -Destination (Join-Path $contextDir 'context-transfer.ps1')
     @{
         schemaVersion = 1
         project = 'test-project'
@@ -183,6 +187,70 @@ function Write-ValidCheckpoint {
         openQuestions = @()
         nextAction = 'Continue with the next task.'
     } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $Env.Checkpoint -Encoding UTF8
+}
+
+function Write-TrackedCheckpoint {
+    param([object]$Env, [string]$ValidationId = 'VAL-1')
+    [ordered]@{
+        schemaVersion = 2
+        repository = 'test-member'
+        scope = 'continuity-v2'
+        status = 'IN_PROGRESS'
+        objective = 'Preserve the exact active workstream across sessions.'
+        confirmedFindings = @('Structured workstream state is available.')
+        decisions = @('Never drop unresolved work items implicitly.')
+        rejectedApproaches = @('Free-form nextAction as the only continuity state.')
+        validation = @('Continuity fixture prepared.')
+        openQuestions = @()
+        nextAction = 'Finish WS-1.'
+        continuity = [ordered]@{
+            mode = 'tracked'
+            workstream = [ordered]@{
+                id = 'landing-polish'
+                title = 'Landing polish backlog'
+                status = 'IN_PROGRESS'
+                objective = 'Finish the durable landing backlog without losing pending work.'
+                repositories = @(
+                    [ordered]@{ repository = 'test-member'; role = 'implementation-owner' },
+                    [ordered]@{ repository = 'test-contracts'; role = 'contract-reference' }
+                )
+                cursor = [ordered]@{
+                    currentItemId = 'WS-1'
+                    lastCompletedItemId = $null
+                    phase = 'implementation'
+                    lastCompletedAction = $null
+                    nextAction = 'Finish WS-1.'
+                }
+                items = @(
+                    [ordered]@{
+                        id = 'WS-1'; title = 'Implement structured backlog'; status = 'IN_PROGRESS'; priority = 'HIGH'
+                        scope = @('tooling/context-lifecycle')
+                        acceptanceCriteria = @('Workstream survives checkpoint and start.')
+                        dependsOn = @(); blockedBy = @(); validationRequirements = @('lifecycle-e2e'); notes = @()
+                    },
+                    [ordered]@{
+                        id = 'WS-2'; title = 'Validate offline resume'; status = 'PENDING'; priority = 'HIGH'
+                        scope = @('tests/context-lifecycle')
+                        acceptanceCriteria = @('Fresh session can identify the exact next item.')
+                        dependsOn = @('WS-1'); blockedBy = @(); validationRequirements = @('offline-resume-e2e'); notes = @()
+                    }
+                )
+            }
+            validationLedger = @(
+                [ordered]@{
+                    id = $ValidationId
+                    kind = 'integration'
+                    result = 'PASS'
+                    repository = 'test-member'
+                    scope = 'continuity-v2'
+                    summary = 'Initial tracked continuity fixture passed.'
+                    timestamp = '2026-08-25T20:00:00+03:30'
+                    command = 'context checkpoint fixture'
+                    evidenceRefs = @()
+                }
+            )
+        }
+    } | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $Env.Checkpoint -Encoding UTF8
 }
 
 $tests = @()
@@ -368,6 +436,377 @@ $tests += @{ Name = 'checkpoint refuses pre-existing dirty context work'; Run = 
         Assert-True -Condition ($result.ExitCode -ne 0) -Message 'Dirty cache checkpoint must fail.'
         Assert-True -Condition ($result.Output -like '*pre-existing uncommitted changes*') -Message 'Dirty-cache failure should be explicit.'
         Assert-True -Condition (Test-Path -LiteralPath (Join-Path $env.Cache 'unexpected.txt')) -Message 'Dirty file must not be destroyed.'
+    } finally { Remove-Item -LiteralPath $env.Base -Recurse -Force -ErrorAction SilentlyContinue }
+} }
+
+$tests += @{ Name = 'v2 tracked checkpoint persists workstream validation ledger and runtime cursor'; Run = {
+    $env = New-TestEnvironment -Name 'v2-tracked'
+    try {
+        Invoke-Launcher -Env $env -Action 'start'
+        Initialize-GitIdentity -Root $env.Cache
+        Write-TrackedCheckpoint -Env $env
+        Invoke-Launcher -Env $env -Action 'checkpoint'
+        Assert-True -Condition (Test-Path -LiteralPath (Join-Path $env.Cache 'workstreams/active/landing-polish.json')) -Message 'Tracked workstream must be stored as a durable active workstream.'
+        Assert-True -Condition (Test-Path -LiteralPath (Join-Path $env.Cache 'validation/repositories/test-member.json')) -Message 'Validation ledger must be persisted.'
+        $manifest = Get-Content -LiteralPath (Join-Path $env.Cache 'manifests/repositories/test-member.json') -Raw | ConvertFrom-Json
+        Assert-True -Condition ($manifest.continuity.workstreamId -eq 'landing-polish') -Message 'Repository manifest must point to the tracked workstream.'
+        Assert-True -Condition ($manifest.continuity.currentItemId -eq 'WS-1') -Message 'Repository manifest must persist the execution cursor.'
+        Invoke-Launcher -Env $env -Action 'start'
+        $runtime = Get-Content -LiteralPath (Join-Path $env.MemberClone '.ai-bridge/context-runtime.json') -Raw | ConvertFrom-Json
+        Assert-True -Condition ($runtime.continuity.workstreamId -eq 'landing-polish') -Message 'Fresh start must recover the active workstream id.'
+        Assert-True -Condition ($runtime.continuity.currentItemId -eq 'WS-1') -Message 'Fresh start must recover the exact current item.'
+        Assert-True -Condition ($runtime.continuity.validation.freshEntries -eq 1) -Message 'Validation recorded for unchanged worktree must be fresh.'
+        $runtimeText = Get-Content -LiteralPath (Join-Path $env.MemberClone '.ai-bridge/context-runtime.md') -Raw
+        Assert-True -Condition ($runtimeText -like '*WS-2 - Validate offline resume*') -Message 'Runtime Markdown must expose pending backlog items.'
+        Assert-True -Condition ($runtimeText -like '*Workstream survives checkpoint and start*') -Message 'Runtime Markdown must expose acceptance criteria.'
+    } finally { Remove-Item -LiteralPath $env.Base -Recurse -Force -ErrorAction SilentlyContinue }
+} }
+
+$tests += @{ Name = 'v2 checkpoint rejects silent work item loss and preserves durable context'; Run = {
+    $env = New-TestEnvironment -Name 'v2-loss'
+    try {
+        Invoke-Launcher -Env $env -Action 'start'
+        Initialize-GitIdentity -Root $env.Cache
+        Write-TrackedCheckpoint -Env $env
+        Invoke-Launcher -Env $env -Action 'checkpoint'
+        $before = Invoke-Git -Root $env.Cache -Arguments @('rev-parse', 'HEAD')
+        Write-TrackedCheckpoint -Env $env -ValidationId 'VAL-2'
+        $checkpoint = Get-Content -LiteralPath $env.Checkpoint -Raw | ConvertFrom-Json
+        $checkpoint.continuity.workstream.items = @($checkpoint.continuity.workstream.items | Where-Object id -ne 'WS-2')
+        $checkpoint | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $env.Checkpoint -Encoding UTF8
+        $result = Invoke-LauncherAllowFailure -Env $env -Action 'checkpoint'
+        Assert-True -Condition ($result.ExitCode -ne 0) -Message 'Dropping a previously tracked work item must fail closed.'
+        Assert-True -Condition ($result.Output -like '*would lose existing work items*WS-2*') -Message 'Loss-prevention failure must identify the lost item.'
+        $after = Invoke-Git -Root $env.Cache -Arguments @('rev-parse', 'HEAD')
+        Assert-True -Condition ($after -eq $before) -Message 'Rejected loss checkpoint must not mutate central context history.'
+        Assert-True -Condition (Test-Path -LiteralPath (Join-Path $env.Cache 'workstreams/active/landing-polish.json')) -Message 'Existing tracked workstream must remain intact.'
+    } finally { Remove-Item -LiteralPath $env.Base -Recurse -Force -ErrorAction SilentlyContinue }
+} }
+
+$tests += @{ Name = 'v2 checkpoint accepts explicit item transition and moves execution cursor'; Run = {
+    $env = New-TestEnvironment -Name 'v2-transition'
+    try {
+        Invoke-Launcher -Env $env -Action 'start'
+        Initialize-GitIdentity -Root $env.Cache
+        Write-TrackedCheckpoint -Env $env
+        Invoke-Launcher -Env $env -Action 'checkpoint'
+        Write-TrackedCheckpoint -Env $env -ValidationId 'VAL-2'
+        $checkpoint = Get-Content -LiteralPath $env.Checkpoint -Raw | ConvertFrom-Json
+        $checkpoint.nextAction = 'Finish WS-2.'
+        $checkpoint.continuity.workstream.cursor.currentItemId = 'WS-2'
+        $checkpoint.continuity.workstream.cursor.lastCompletedItemId = 'WS-1'
+        $checkpoint.continuity.workstream.cursor.lastCompletedAction = 'Implemented structured backlog.'
+        $checkpoint.continuity.workstream.cursor.nextAction = 'Finish WS-2.'
+        $checkpoint.continuity.workstream.items[0].status = 'COMPLETED'
+        $checkpoint.continuity.workstream.items[1].status = 'IN_PROGRESS'
+        $checkpoint | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $env.Checkpoint -Encoding UTF8
+        Invoke-Launcher -Env $env -Action 'checkpoint'
+        $workstream = Get-Content -LiteralPath (Join-Path $env.Cache 'workstreams/active/landing-polish.json') -Raw | ConvertFrom-Json
+        Assert-True -Condition ($workstream.cursor.currentItemId -eq 'WS-2') -Message 'Explicit cursor transition must be persisted.'
+        Assert-True -Condition ($workstream.items[0].status -eq 'COMPLETED') -Message 'Completed work item transition must be persisted.'
+        Assert-True -Condition ($workstream.items[1].status -eq 'IN_PROGRESS') -Message 'Next work item must be explicitly in progress.'
+    } finally { Remove-Item -LiteralPath $env.Base -Recurse -Force -ErrorAction SilentlyContinue }
+} }
+
+$tests += @{ Name = 'v2 validation ledger becomes stale when member worktree changes'; Run = {
+    $env = New-TestEnvironment -Name 'v2-stale-validation'
+    try {
+        Invoke-Launcher -Env $env -Action 'start'
+        Initialize-GitIdentity -Root $env.Cache
+        Write-TrackedCheckpoint -Env $env
+        Invoke-Launcher -Env $env -Action 'checkpoint'
+        Add-Content -LiteralPath (Join-Path $env.MemberClone 'README.md') -Value 'product drift'
+        Invoke-Launcher -Env $env -Action 'start'
+        $runtime = Get-Content -LiteralPath (Join-Path $env.MemberClone '.ai-bridge/context-runtime.json') -Raw | ConvertFrom-Json
+        Assert-True -Condition ($runtime.continuity.validation.freshEntries -eq 0) -Message 'Validation must not remain fresh after member worktree changes.'
+        Assert-True -Condition ($runtime.continuity.validation.staleEntries -eq 1) -Message 'Changed worktree must mark the previous validation stale.'
+    } finally { Remove-Item -LiteralPath $env.Base -Recurse -Force -ErrorAction SilentlyContinue }
+} }
+
+$tests += @{ Name = 'legacy v1 checkpoint cannot erase an unresolved v2 workstream'; Run = {
+    $env = New-TestEnvironment -Name 'v2-v1-loss'
+    try {
+        Invoke-Launcher -Env $env -Action 'start'
+        Initialize-GitIdentity -Root $env.Cache
+        Write-TrackedCheckpoint -Env $env
+        Invoke-Launcher -Env $env -Action 'checkpoint'
+        Write-ValidCheckpoint -Env $env
+        $result = Invoke-LauncherAllowFailure -Env $env -Action 'checkpoint'
+        Assert-True -Condition ($result.ExitCode -ne 0) -Message 'Legacy checkpoint must not silently erase an active v2 workstream.'
+        Assert-True -Condition ($result.Output -like '*would lose an active tracked workstream*') -Message 'Legacy loss rejection must be explicit.'
+    } finally { Remove-Item -LiteralPath $env.Base -Recurse -Force -ErrorAction SilentlyContinue }
+} }
+
+$tests += @{ Name = 'v2 dependency cycle is rejected'; Run = {
+    $env = New-TestEnvironment -Name 'v2-cycle'
+    try {
+        Invoke-Launcher -Env $env -Action 'start'
+        Initialize-GitIdentity -Root $env.Cache
+        Write-TrackedCheckpoint -Env $env
+        $checkpoint = Get-Content -LiteralPath $env.Checkpoint -Raw | ConvertFrom-Json
+        $checkpoint.continuity.workstream.items[0].dependsOn = @('WS-2')
+        $checkpoint | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $env.Checkpoint -Encoding UTF8
+        $result = Invoke-LauncherAllowFailure -Env $env -Action 'checkpoint'
+        Assert-True -Condition ($result.ExitCode -ne 0) -Message 'Dependency cycle must fail closed.'
+        Assert-True -Condition ($result.Output -like '*dependency cycle*') -Message 'Dependency-cycle rejection must be explicit.'
+    } finally { Remove-Item -LiteralPath $env.Base -Recurse -Force -ErrorAction SilentlyContinue }
+} }
+
+$tests += @{ Name = 'v2 duplicate validation ledger id is rejected'; Run = {
+    $env = New-TestEnvironment -Name 'v2-duplicate-validation'
+    try {
+        Invoke-Launcher -Env $env -Action 'start'
+        Initialize-GitIdentity -Root $env.Cache
+        Write-TrackedCheckpoint -Env $env
+        Invoke-Launcher -Env $env -Action 'checkpoint'
+        $before = Invoke-Git -Root $env.Cache -Arguments @('rev-parse', 'HEAD')
+        Write-TrackedCheckpoint -Env $env -ValidationId 'VAL-1'
+        $result = Invoke-LauncherAllowFailure -Env $env -Action 'checkpoint'
+        Assert-True -Condition ($result.ExitCode -ne 0) -Message 'Duplicate immutable validation id must fail.'
+        Assert-True -Condition ($result.Output -like '*immutable and already exist*VAL-1*') -Message 'Duplicate validation rejection must identify the id.'
+        $after = Invoke-Git -Root $env.Cache -Arguments @('rev-parse', 'HEAD')
+        Assert-True -Condition ($after -eq $before) -Message 'Duplicate validation rejection must not mutate context history.'
+    } finally { Remove-Item -LiteralPath $env.Base -Recurse -Force -ErrorAction SilentlyContinue }
+} }
+
+$tests += @{ Name = 'v2 snapshot cannot erase an unresolved tracked workstream'; Run = {
+    $env = New-TestEnvironment -Name 'v2-snapshot-loss'
+    try {
+        Invoke-Launcher -Env $env -Action 'start'
+        Initialize-GitIdentity -Root $env.Cache
+        Write-TrackedCheckpoint -Env $env
+        Invoke-Launcher -Env $env -Action 'checkpoint'
+        [ordered]@{
+            schemaVersion = 2; repository = 'test-member'; scope = 'snapshot-loss'; status = 'VALIDATED'
+            objective = 'Attempt unsafe snapshot.'; confirmedFindings = @(); decisions = @(); rejectedApproaches = @()
+            validation = @(); openQuestions = @(); nextAction = 'Continue.'
+            continuity = [ordered]@{ mode = 'snapshot'; workstream = $null; validationLedger = @() }
+        } | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $env.Checkpoint -Encoding UTF8
+        $result = Invoke-LauncherAllowFailure -Env $env -Action 'checkpoint'
+        Assert-True -Condition ($result.ExitCode -ne 0) -Message 'Snapshot must not erase unresolved tracked work.'
+        Assert-True -Condition ($result.Output -like '*Snapshot checkpoint would lose an active tracked workstream*') -Message 'Snapshot-loss rejection must be explicit.'
+    } finally { Remove-Item -LiteralPath $env.Base -Recurse -Force -ErrorAction SilentlyContinue }
+} }
+
+$tests += @{ Name = 'v2 completed workstream moves from active to archive'; Run = {
+    $env = New-TestEnvironment -Name 'v2-archive'
+    try {
+        Invoke-Launcher -Env $env -Action 'start'
+        Initialize-GitIdentity -Root $env.Cache
+        Write-TrackedCheckpoint -Env $env
+        Invoke-Launcher -Env $env -Action 'checkpoint'
+
+        Write-TrackedCheckpoint -Env $env -ValidationId 'VAL-2'
+        $checkpoint = Get-Content -LiteralPath $env.Checkpoint -Raw | ConvertFrom-Json
+        $checkpoint.nextAction = 'Finish WS-2.'
+        $checkpoint.continuity.workstream.cursor.currentItemId = 'WS-2'
+        $checkpoint.continuity.workstream.cursor.lastCompletedItemId = 'WS-1'
+        $checkpoint.continuity.workstream.cursor.lastCompletedAction = 'Finished WS-1.'
+        $checkpoint.continuity.workstream.cursor.nextAction = 'Finish WS-2.'
+        $checkpoint.continuity.workstream.items[0].status = 'COMPLETED'
+        $checkpoint.continuity.workstream.items[1].status = 'IN_PROGRESS'
+        $checkpoint | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $env.Checkpoint -Encoding UTF8
+        Invoke-Launcher -Env $env -Action 'checkpoint'
+
+        Write-TrackedCheckpoint -Env $env -ValidationId 'VAL-3'
+        $checkpoint = Get-Content -LiteralPath $env.Checkpoint -Raw | ConvertFrom-Json
+        $checkpoint.status = 'VALIDATED'
+        $checkpoint.nextAction = 'Workstream complete.'
+        $checkpoint.continuity.workstream.status = 'COMPLETED'
+        $checkpoint.continuity.workstream.cursor.currentItemId = $null
+        $checkpoint.continuity.workstream.cursor.lastCompletedItemId = 'WS-2'
+        $checkpoint.continuity.workstream.cursor.lastCompletedAction = 'Validated offline resume.'
+        $checkpoint.continuity.workstream.cursor.nextAction = 'Workstream complete.'
+        $checkpoint.continuity.workstream.items[0].status = 'COMPLETED'
+        $checkpoint.continuity.workstream.items[1].status = 'COMPLETED'
+        $checkpoint | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $env.Checkpoint -Encoding UTF8
+        Invoke-Launcher -Env $env -Action 'checkpoint'
+
+        Assert-True -Condition (-not (Test-Path -LiteralPath (Join-Path $env.Cache 'workstreams/active/landing-polish.json'))) -Message 'Completed workstream must leave active storage.'
+        Assert-True -Condition (Test-Path -LiteralPath (Join-Path $env.Cache 'workstreams/archive/landing-polish.json')) -Message 'Completed workstream must be archived durably.'
+        $manifest = Get-Content -LiteralPath (Join-Path $env.Cache 'manifests/repositories/test-member.json') -Raw | ConvertFrom-Json
+        Assert-True -Condition ($manifest.continuity.workstreamStatus -eq 'COMPLETED') -Message 'Manifest must record terminal workstream status.'
+        Assert-True -Condition ($manifest.continuity.workstreamPath -eq 'workstreams/archive/landing-polish.json') -Message 'Manifest must point to archived workstream.'
+        Assert-True -Condition ($null -eq $manifest.continuity.currentItemId) -Message 'Completed workstream must clear current item.'
+    } finally { Remove-Item -LiteralPath $env.Base -Recurse -Force -ErrorAction SilentlyContinue }
+} }
+
+$tests += @{ Name = 'offline export import resumes exact workstream without remote access and supports offline checkpoint'; Run = {
+    $env = New-TestEnvironment -Name 'offline-roundtrip'
+    try {
+        Invoke-Launcher -Env $env -Action 'start'
+        Initialize-GitIdentity -Root $env.Cache
+        Write-TrackedCheckpoint -Env $env
+        Invoke-Launcher -Env $env -Action 'checkpoint'
+        Invoke-Launcher -Env $env -Action 'export'
+
+        $transfer = Join-Path $env.MemberClone '.ai-bridge/context-transfer'
+        Assert-True -Condition (Test-Path -LiteralPath (Join-Path $transfer 'manifest.json')) -Message 'Offline export must create a manifest.'
+        Assert-True -Condition (Test-Path -LiteralPath (Join-Path $transfer 'context.bundle')) -Message 'Offline export must create a Git bundle.'
+
+        $consumerRoot = Join-Path $env.Base 'member-offline'
+        & git clone $env.MemberBare $consumerRoot | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw 'Unable to clone offline consumer member repository.' }
+        Initialize-GitIdentity -Root $consumerRoot
+        $consumerTransfer = Join-Path $consumerRoot '.ai-bridge/context-transfer'
+        New-Item -ItemType Directory -Path (Split-Path -Parent $consumerTransfer) -Force | Out-Null
+        Copy-Item -LiteralPath $transfer -Destination $consumerTransfer -Recurse
+
+        $offlineRemote = "$($env.ContextBare).offline"
+        Move-Item -LiteralPath $env.ContextBare -Destination $offlineRemote
+
+        $consumer = [pscustomobject]@{
+            Base = $env.Base
+            MemberClone = $consumerRoot
+            Launcher = (Join-Path $consumerRoot '.ai/context/context.ps1')
+            Cache = (Join-Path $consumerRoot '.ai/context/cache/project-context')
+            Checkpoint = (Join-Path $consumerRoot '.ai-bridge/context-checkpoint.json')
+        }
+        Invoke-Launcher -Env $consumer -Action 'import'
+        Initialize-GitIdentity -Root $consumer.Cache
+        Invoke-Launcher -Env $consumer -Action 'start'
+        $runtime = Get-Content -LiteralPath (Join-Path $consumerRoot '.ai-bridge/context-runtime.json') -Raw | ConvertFrom-Json
+        Assert-True -Condition ($runtime.context.freshness -eq 'OFFLINE_IMPORTED_CONTEXT') -Message 'Offline start must explicitly report imported offline context.'
+        Assert-True -Condition ($runtime.continuity.workstreamId -eq 'landing-polish') -Message 'Offline import must recover the active workstream.'
+        Assert-True -Condition ($runtime.continuity.currentItemId -eq 'WS-1') -Message 'Offline import must recover the exact execution cursor.'
+
+        $beforeOfflineCheckpoint = Invoke-Git -Root $consumer.Cache -Arguments @('rev-parse', 'HEAD')
+        Write-TrackedCheckpoint -Env $consumer -ValidationId 'VAL-OFFLINE-2'
+        $checkpoint = Get-Content -LiteralPath $consumer.Checkpoint -Raw | ConvertFrom-Json
+        $checkpoint.nextAction = 'Finish WS-2.'
+        $checkpoint.continuity.workstream.cursor.currentItemId = 'WS-2'
+        $checkpoint.continuity.workstream.cursor.lastCompletedItemId = 'WS-1'
+        $checkpoint.continuity.workstream.cursor.lastCompletedAction = 'Finished WS-1 offline.'
+        $checkpoint.continuity.workstream.cursor.nextAction = 'Finish WS-2.'
+        $checkpoint.continuity.workstream.items[0].status = 'COMPLETED'
+        $checkpoint.continuity.workstream.items[1].status = 'IN_PROGRESS'
+        $checkpoint | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $consumer.Checkpoint -Encoding UTF8
+        Invoke-Launcher -Env $consumer -Action 'checkpoint'
+        $afterOfflineCheckpoint = Invoke-Git -Root $consumer.Cache -Arguments @('rev-parse', 'HEAD')
+        Assert-True -Condition ($afterOfflineCheckpoint -ne $beforeOfflineCheckpoint) -Message 'Offline checkpoint must commit continuity locally.'
+        $marker = Get-Content -LiteralPath (Join-Path $consumerRoot '.ai-bridge/context-offline.json') -Raw | ConvertFrom-Json
+        Assert-True -Condition ($marker.currentContextHead -eq $afterOfflineCheckpoint) -Message 'Offline marker must advance to the local checkpoint HEAD.'
+        Invoke-Launcher -Env $consumer -Action 'start'
+        $runtime2 = Get-Content -LiteralPath (Join-Path $consumerRoot '.ai-bridge/context-runtime.json') -Raw | ConvertFrom-Json
+        Assert-True -Condition ($runtime2.continuity.currentItemId -eq 'WS-2') -Message 'Offline resume after local checkpoint must recover the new current item.'
+
+        Move-Item -LiteralPath $offlineRemote -Destination $env.ContextBare
+        Invoke-Launcher -Env $consumer -Action 'reconnect'
+        Assert-True -Condition (-not (Test-Path -LiteralPath (Join-Path $consumerRoot '.ai-bridge/context-offline.json'))) -Message 'Successful reconnect must clear the offline marker.'
+        $remoteHead = (& git --git-dir $env.ContextBare rev-parse refs/heads/main).Trim()
+        Assert-True -Condition ($remoteHead -eq $afterOfflineCheckpoint) -Message 'Reconnect must publish offline context commits with a normal push.'
+        Invoke-Launcher -Env $consumer -Action 'start'
+        $runtime3 = Get-Content -LiteralPath (Join-Path $consumerRoot '.ai-bridge/context-runtime.json') -Raw | ConvertFrom-Json
+        Assert-True -Condition ($runtime3.context.freshness -eq 'CURRENT_OR_FETCHED') -Message 'After reconnect, lifecycle must return to ordinary online freshness.'
+        Assert-True -Condition ($runtime3.continuity.currentItemId -eq 'WS-2') -Message 'Reconnect must preserve the exact workstream cursor.'
+    } finally { Remove-Item -LiteralPath $env.Base -Recurse -Force -ErrorAction SilentlyContinue }
+} }
+
+$tests += @{ Name = 'offline import rejects tampered bundle before cache creation'; Run = {
+    $env = New-TestEnvironment -Name 'offline-tamper'
+    try {
+        Invoke-Launcher -Env $env -Action 'start'
+        Initialize-GitIdentity -Root $env.Cache
+        Write-TrackedCheckpoint -Env $env
+        Invoke-Launcher -Env $env -Action 'checkpoint'
+        Invoke-Launcher -Env $env -Action 'export'
+        Remove-Item -LiteralPath $env.Cache -Recurse -Force
+        Add-Content -LiteralPath (Join-Path $env.MemberClone '.ai-bridge/context-transfer/context.bundle') -Value 'tampered'
+        $result = Invoke-LauncherAllowFailure -Env $env -Action 'import'
+        Assert-True -Condition ($result.ExitCode -ne 0) -Message 'Tampered transfer bundle must be rejected.'
+        Assert-True -Condition (($result.Output -like '*bundle size does not match*') -or ($result.Output -like '*SHA-256 does not match*')) -Message 'Tampered bundle rejection must be integrity-specific.'
+        Assert-True -Condition (-not (Test-Path -LiteralPath (Join-Path $env.Cache '.git'))) -Message 'Rejected tampered transfer must not create an imported cache.'
+    } finally { Remove-Item -LiteralPath $env.Base -Recurse -Force -ErrorAction SilentlyContinue }
+} }
+
+$tests += @{ Name = 'offline import rejects conflicting existing context head without reconciliation'; Run = {
+    $env = New-TestEnvironment -Name 'offline-conflict'
+    try {
+        Invoke-Launcher -Env $env -Action 'start'
+        Initialize-GitIdentity -Root $env.Cache
+        Write-TrackedCheckpoint -Env $env
+        Invoke-Launcher -Env $env -Action 'checkpoint'
+        Invoke-Launcher -Env $env -Action 'export'
+        Set-Content -LiteralPath (Join-Path $env.Cache 'local-conflict.md') -Value 'independent offline writer' -Encoding UTF8
+        Invoke-Git -Root $env.Cache -Arguments @('add', 'local-conflict.md') | Out-Null
+        Invoke-Git -Root $env.Cache -Arguments @('commit', '-m', 'local conflicting context') | Out-Null
+        $conflictHead = Invoke-Git -Root $env.Cache -Arguments @('rev-parse', 'HEAD')
+        $result = Invoke-LauncherAllowFailure -Env $env -Action 'import'
+        Assert-True -Condition ($result.ExitCode -ne 0) -Message 'Import over a different clean context HEAD must fail closed.'
+        Assert-True -Condition ($result.Output -like '*conflicts with the existing context cache HEAD*') -Message 'Offline writer conflict must be explicit.'
+        Assert-True -Condition ((Invoke-Git -Root $env.Cache -Arguments @('rev-parse', 'HEAD')) -eq $conflictHead) -Message 'Conflict rejection must preserve the existing context HEAD.'
+    } finally { Remove-Item -LiteralPath $env.Base -Recurse -Force -ErrorAction SilentlyContinue }
+} }
+
+$tests += @{ Name = 'offline export rejects secret-like tracked context material'; Run = {
+    $env = New-TestEnvironment -Name 'offline-secret'
+    try {
+        Invoke-Launcher -Env $env -Action 'start'
+        Initialize-GitIdentity -Root $env.Cache
+        Set-Content -LiteralPath (Join-Path $env.Cache 'secret-fixture.md') -Value 'Bearer abcdefghijklmnop' -Encoding UTF8
+        Invoke-Git -Root $env.Cache -Arguments @('add', 'secret-fixture.md') | Out-Null
+        Invoke-Git -Root $env.Cache -Arguments @('commit', '-m', 'secret fixture') | Out-Null
+        $result = Invoke-LauncherAllowFailure -Env $env -Action 'export'
+        Assert-True -Condition ($result.ExitCode -ne 0) -Message 'Secret-like tracked context must block offline export.'
+        Assert-True -Condition ($result.Output -like '*refused secret-like material*secret-fixture.md*') -Message 'Secret export rejection must identify the tracked context path.'
+    } finally { Remove-Item -LiteralPath $env.Base -Recurse -Force -ErrorAction SilentlyContinue }
+} }
+
+$tests += @{ Name = 'offline reconnect rejects divergent local and remote writers without mutation'; Run = {
+    $env = New-TestEnvironment -Name 'offline-reconnect-diverged'
+    try {
+        Invoke-Launcher -Env $env -Action 'start'
+        Initialize-GitIdentity -Root $env.Cache
+        Write-TrackedCheckpoint -Env $env
+        Invoke-Launcher -Env $env -Action 'checkpoint'
+        Invoke-Launcher -Env $env -Action 'export'
+        $remoteDisabled = "$($env.ContextBare).offline"
+        Move-Item -LiteralPath $env.ContextBare -Destination $remoteDisabled
+
+        $consumerRoot = Join-Path $env.Base 'member-offline-diverged'
+        & git clone $env.MemberBare $consumerRoot | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw 'Unable to clone divergent offline consumer.' }
+        Initialize-GitIdentity -Root $consumerRoot
+        Copy-Item -LiteralPath (Join-Path $env.MemberClone '.ai-bridge/context-transfer') -Destination (Join-Path $consumerRoot '.ai-bridge/context-transfer') -Recurse
+        $consumer = [pscustomobject]@{
+            Base = $env.Base
+            MemberClone = $consumerRoot
+            Launcher = (Join-Path $consumerRoot '.ai/context/context.ps1')
+            Cache = (Join-Path $consumerRoot '.ai/context/cache/project-context')
+            Checkpoint = (Join-Path $consumerRoot '.ai-bridge/context-checkpoint.json')
+        }
+        Invoke-Launcher -Env $consumer -Action 'import'
+        Initialize-GitIdentity -Root $consumer.Cache
+        Write-TrackedCheckpoint -Env $consumer -ValidationId 'VAL-DIVERGED-2'
+        $checkpoint = Get-Content -LiteralPath $consumer.Checkpoint -Raw | ConvertFrom-Json
+        $checkpoint.nextAction = 'Finish WS-2.'
+        $checkpoint.continuity.workstream.cursor.currentItemId = 'WS-2'
+        $checkpoint.continuity.workstream.cursor.lastCompletedItemId = 'WS-1'
+        $checkpoint.continuity.workstream.cursor.lastCompletedAction = 'Finished WS-1 offline.'
+        $checkpoint.continuity.workstream.cursor.nextAction = 'Finish WS-2.'
+        $checkpoint.continuity.workstream.items[0].status = 'COMPLETED'
+        $checkpoint.continuity.workstream.items[1].status = 'IN_PROGRESS'
+        $checkpoint | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $consumer.Checkpoint -Encoding UTF8
+        Invoke-Launcher -Env $consumer -Action 'checkpoint'
+        $localHead = Invoke-Git -Root $consumer.Cache -Arguments @('rev-parse', 'HEAD')
+
+        Move-Item -LiteralPath $remoteDisabled -Destination $env.ContextBare
+        $remoteWriter = Join-Path $env.Base 'remote-writer'
+        & git clone --branch main --single-branch $env.ContextBare $remoteWriter | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw 'Unable to clone remote writer.' }
+        Initialize-GitIdentity -Root $remoteWriter
+        Set-Content -LiteralPath (Join-Path $remoteWriter 'remote-independent.md') -Value 'remote writer' -Encoding UTF8
+        Invoke-Git -Root $remoteWriter -Arguments @('add', 'remote-independent.md') | Out-Null
+        Invoke-Git -Root $remoteWriter -Arguments @('commit', '-m', 'remote independent context') | Out-Null
+        Invoke-Git -Root $remoteWriter -Arguments @('push', 'origin', 'main') | Out-Null
+        $remoteHead = (& git --git-dir $env.ContextBare rev-parse refs/heads/main).Trim()
+
+        $result = Invoke-LauncherAllowFailure -Env $consumer -Action 'reconnect'
+        Assert-True -Condition ($result.ExitCode -ne 0) -Message 'Divergent offline/remote context must fail reconnect.'
+        Assert-True -Condition ($result.Output -like '*offline reconciliation conflict*') -Message 'Divergence rejection must be explicit.'
+        Assert-True -Condition ((Invoke-Git -Root $consumer.Cache -Arguments @('rev-parse','HEAD')) -eq $localHead) -Message 'Reconnect conflict must preserve local context HEAD.'
+        Assert-True -Condition ((& git --git-dir $env.ContextBare rev-parse refs/heads/main).Trim() -eq $remoteHead) -Message 'Reconnect conflict must preserve remote context HEAD.'
+        Assert-True -Condition (Test-Path -LiteralPath (Join-Path $consumerRoot '.ai-bridge/context-offline.json')) -Message 'Reconnect conflict must preserve offline marker for explicit reconciliation.'
     } finally { Remove-Item -LiteralPath $env.Base -Recurse -Force -ErrorAction SilentlyContinue }
 } }
 

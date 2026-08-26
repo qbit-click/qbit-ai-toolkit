@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any
 
 INSTALLER_ID = "installer.ai-context"
-INSTALLER_VERSION = "1.1.2"
+INSTALLER_VERSION = "1.2.0"
 STATE_PATH = ".qbit/toolkit/installed/ai-context.json"
 BLOCK_BEGIN = "<!-- qbit-toolkit:ai-context:start -->"
 BLOCK_END = "<!-- qbit-toolkit:ai-context:end -->"
@@ -194,7 +194,7 @@ def new_spec(mode: str, v: dict[str, str]) -> Spec:
     seeds: dict[str, str] = {}
     legacy_blocks: dict[str, str] = {}
     if mode == "member":
-        for rel in ("context.ps1", "context.sh", "context.py"):
+        for rel in ("context.ps1", "context.sh", "context.py", "context-transfer.ps1"):
             files[f".ai/context/{rel}"] = read_template(f"templates/common/member/{rel}")
         files[".ai/context/config.json"] = render("templates/common/member/config.json.tpl", v)
         files[".ai/context/.gitignore"] = read_template("templates/common/member/context.gitignore")
@@ -208,8 +208,9 @@ def new_spec(mode: str, v: dict[str, str]) -> Spec:
         legacy_blocks[".ai-bridge/.gitignore"] = read_template("templates/common/member/bridge.gitignore")
     else:
         files["tooling/context-lifecycle.ps1"] = read_template("templates/common/central/tooling/context-lifecycle.ps1")
+        files["tooling/context-continuity.ps1"] = read_template("templates/common/central/tooling/context-continuity.ps1")
         files["tooling/context-lifecycle.py"] = read_template("templates/common/central/tooling/context-lifecycle.py")
-        for rel in ("context.ps1", "context.sh", "context.py"):
+        for rel in ("context.ps1", "context.sh", "context.py", "context-transfer.ps1"):
             files[f"templates/member/{rel}"] = read_template(f"templates/common/member/{rel}")
         files["tests/context-lifecycle.tests.ps1"] = read_template("templates/common/central/tests/context-lifecycle.tests.ps1")
         files["tests/context-lifecycle.tests.sh"] = read_template("templates/common/central/tests/context-lifecycle.tests.sh")

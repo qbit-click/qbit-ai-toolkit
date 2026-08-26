@@ -18,7 +18,7 @@
     "nextAction"
   ],
   "properties": {
-    "schemaVersion": { "const": 1 },
+    "schemaVersion": { "enum": [1, 2] },
     "repository": { "type": "string", "minLength": 1 },
     "scope": { "type": "string", "minLength": 1 },
     "status": {
@@ -42,6 +42,117 @@
     "rejectedApproaches": { "type": "array", "items": { "type": "string" } },
     "validation": { "type": "array", "items": { "type": "string" } },
     "openQuestions": { "type": "array", "items": { "type": "string" } },
-    "nextAction": { "type": "string", "minLength": 1 }
+    "nextAction": { "type": "string", "minLength": 1 },
+    "continuity": { "$ref": "#/$defs/continuity" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "schemaVersion": { "const": 2 } }, "required": ["schemaVersion"] },
+      "then": { "required": ["continuity"] }
+    }
+  ],
+  "$defs": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "stringArray": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "uniqueItems": true
+    },
+    "continuity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "workstream", "validationLedger"],
+      "properties": {
+        "mode": { "enum": ["snapshot", "tracked"] },
+        "workstream": {
+          "oneOf": [
+            { "type": "null" },
+            { "$ref": "#/$defs/workstream" }
+          ]
+        },
+        "validationLedger": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/validationEntry" }
+        }
+      }
+    },
+    "workstream": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title", "status", "objective", "repositories", "cursor", "items"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "title": { "type": "string", "minLength": 1 },
+        "status": { "enum": ["PROPOSED", "IN_PROGRESS", "BLOCKED", "COMPLETED", "CANCELLED", "SUPERSEDED"] },
+        "objective": { "type": "string", "minLength": 1 },
+        "repositories": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["repository", "role"],
+            "properties": {
+              "repository": { "$ref": "#/$defs/id" },
+              "role": { "type": "string", "minLength": 1 }
+            }
+          }
+        },
+        "cursor": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["currentItemId", "lastCompletedItemId", "phase", "lastCompletedAction", "nextAction"],
+          "properties": {
+            "currentItemId": { "type": ["string", "null"] },
+            "lastCompletedItemId": { "type": ["string", "null"] },
+            "phase": { "type": ["string", "null"] },
+            "lastCompletedAction": { "type": ["string", "null"] },
+            "nextAction": { "type": "string", "minLength": 1 }
+          }
+        },
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/workItem" }
+        }
+      }
+    },
+    "workItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title", "status", "priority", "scope", "acceptanceCriteria", "dependsOn", "blockedBy", "validationRequirements", "notes"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "title": { "type": "string", "minLength": 1 },
+        "status": { "enum": ["PENDING", "IN_PROGRESS", "BLOCKED", "COMPLETED", "CANCELLED", "SUPERSEDED"] },
+        "priority": { "enum": ["CRITICAL", "HIGH", "MEDIUM", "LOW"] },
+        "scope": { "$ref": "#/$defs/stringArray" },
+        "acceptanceCriteria": { "$ref": "#/$defs/stringArray" },
+        "dependsOn": { "$ref": "#/$defs/stringArray" },
+        "blockedBy": { "$ref": "#/$defs/stringArray" },
+        "validationRequirements": { "$ref": "#/$defs/stringArray" },
+        "notes": { "$ref": "#/$defs/stringArray" }
+      }
+    },
+    "validationEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "result", "repository", "scope", "summary", "timestamp", "command", "evidenceRefs"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "kind": { "type": "string", "minLength": 1 },
+        "result": { "enum": ["PASS", "FAIL", "INCONCLUSIVE", "SKIPPED"] },
+        "repository": { "$ref": "#/$defs/id" },
+        "scope": { "type": "string", "minLength": 1 },
+        "summary": { "type": "string", "minLength": 1 },
+        "timestamp": { "type": "string", "minLength": 1 },
+        "command": { "type": ["string", "null"] },
+        "evidenceRefs": { "$ref": "#/$defs/stringArray" }
+      }
+    }
   }
 }

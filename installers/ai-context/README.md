@@ -95,11 +95,15 @@ State is written last to `.qbit/toolkit/installed/ai-context.json`. Mutations sn
 Member agents select the launcher for the active host:
 
 ```text
-Windows      .ai/context/context.ps1 start|status|checkpoint
-Linux/macOS  bash .ai/context/context.sh start|status|checkpoint
+Windows      .ai/context/context.ps1 start|status|checkpoint|export|import|reconnect
+Linux/macOS  bash .ai/context/context.sh start|status|checkpoint|export|import|reconnect
 ```
 
-The POSIX launcher uses only Python's standard library plus Git. Cache refresh is non-destructive: dirty context caches are never overwritten, diverged caches are not reset, and dirty caches refuse automatic origin migration/checkpointing. Checkpoint content is shape/status validated and secret-like material is rejected before central continuity files are written.
+The POSIX launcher uses only Python's standard library plus Git. Cache refresh is non-destructive: dirty context caches are never overwritten, diverged caches are not reset, and dirty caches refuse automatic origin migration/checkpointing. New substantive checkpoints use schema v2 tracked continuity with stable work-item IDs, execution cursor, dependencies, acceptance criteria, and structured validation ledger entries. The lifecycle rejects silent work-item loss, invalid status transitions, dependency cycles, duplicate validation IDs, and snapshot/downgrade attempts that would erase unresolved work. Validation evidence is bound to a deterministic member worktree fingerprint and is reported stale after relevant source changes. Secret-like material is rejected before central continuity files are written.
+
+`export` creates an ignored `.ai-bridge/context-transfer/` package containing a verified Git bundle plus a manifest with project/repository identity, source provenance, continuity summary, byte length, and SHA-256. Export requires a clean context cache and scans all tracked context files for unsupported file types, symlink/reparse escapes, non-UTF-8 content, and secret-like material. `import` verifies the manifest, bundle size/hash, Git bundle integrity, configured repository/branch identity, and exact source HEAD before creating or accepting a local context cache. An imported cache runs `start` and `checkpoint` without network access and reports freshness as `OFFLINE_IMPORTED_CONTEXT`; offline checkpoints commit locally and never attempt a push.
+
+When connectivity returns, `reconnect` is the only supported automatic exit from imported offline mode. If the remote context branch is an ancestor of the local offline history, reconnect performs a normal non-force push. If the local history is an ancestor of the remote, it fast-forwards locally. If both sides advanced independently, reconnect fails closed and preserves both histories plus the offline marker; it never auto-merges, rebases, resets, or force-pushes divergent continuity.
 
 ## Security and authority
 

@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.2.0
+
+- Add Continuity v2 tracked workstreams with stable work-item IDs, execution cursor, repository roles, dependencies/blockers, acceptance criteria, validation requirements, and archived terminal workstreams.
+- Enforce fail-closed continuity invariants including silent work-item loss prevention, invalid status transitions, dependency-cycle rejection, duplicate validation-ID rejection, and protection against legacy/snapshot checkpoints erasing unresolved tracked work.
+- Bind structured validation ledger entries to repository HEAD plus deterministic worktree fingerprints and report stale evidence after member source changes.
+- Add offline context `export`, `import`, and `reconnect` workflows with Git-bundle integrity checks, SHA-256/size verification, repository/branch/source-HEAD binding, tracked-context secret scanning, and safe no-network checkpoint continuation.
+- Reject divergent offline/remote writers during reconnect without automatic merge, rebase, reset, or force-push; remove offline mode only after successful synchronization.
+- Add Windows, POSIX, and native WSL/Linux lifecycle coverage for offline round-trip, tamper/conflict rejection, reconnect behavior, and cross-platform deterministic installer ownership state.
+
 ## 1.1.2
 
 - Canonicalize UTF-8 managed-file ownership hashes across BOM and LF/CRLF/CR line-ending differences so Git checkout normalization does not create false ownership conflicts.

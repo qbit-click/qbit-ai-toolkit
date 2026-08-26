@@ -7,11 +7,14 @@ param(
     [string]$RepositoryRoot,
 
     [Parameter(Mandatory = $true)]
-    [string]$ConfigPath
+    [string]$ConfigPath,
+
+    [switch]$Offline
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'context-continuity.ps1')
 
 function Invoke-Git {
     param(
@@ -134,6 +137,7 @@ function Get-GitState {
         upstream = $upstream
         ahead = $ahead
         behind = $behind
+        fingerprint = (Get-ContinuityFingerprint -Root $Root)
     }
 }
 
@@ -187,6 +191,7 @@ function Write-RuntimeBundle {
             upstream = $memberState.upstream
             ahead = $memberState.ahead
             behind = $memberState.behind
+            fingerprint = $memberState.fingerprint
         }
         context = [ordered]@{
             root = $ContextRoot
@@ -196,6 +201,17 @@ function Write-RuntimeBundle {
             dirty = $contextState.dirty
             freshness = $ContextFreshness
         }
+    }
+
+    $repoId = [string]$Config.repository
+    $continuityRuntime = Get-ContinuityRuntime -ContextRoot $ContextRoot -Repository $repoId -MemberState $memberState
+    $runtime['continuity'] = [ordered]@{
+        mode = $continuityRuntime.mode
+        workstreamId = $continuityRuntime.workstreamId
+        workstreamStatus = $continuityRuntime.workstreamStatus
+        currentItemId = $continuityRuntime.currentItemId
+        workstreamPath = $continuityRuntime.workstreamPath
+        validation = $continuityRuntime.validation
     }
 
     $runtimeJsonPath = Join-Path $bridgeDir 'context-runtime.json'
@@ -254,6 +270,26 @@ function Write-RuntimeBundle {
         }
     }
 
+    if ($null -ne $continuityRuntime.workstream) {
+        $sections.Add('')
+        $sections.Add('## Active Workstream')
+        $sections.Add('')
+        $sections.Add("Source: ``$($continuityRuntime.workstreamPath)``")
+        $sections.Add('')
+        $sections.Add((Convert-ContinuityWorkstreamToMarkdown -Workstream $continuityRuntime.workstream).TrimEnd())
+    }
+    $sections.Add('')
+    $sections.Add('## Validation Freshness')
+    $sections.Add('')
+    $sections.Add("Source: ``$($continuityRuntime.validation.path)``")
+    $sections.Add('')
+    $sections.Add("Entries: $($continuityRuntime.validation.entries)")
+    $sections.Add("Fresh for current worktree: $($continuityRuntime.validation.freshEntries)")
+    $sections.Add("Stale for current worktree: $($continuityRuntime.validation.staleEntries)")
+    if ($null -ne $continuityRuntime.validation.mostRecent) {
+        $sections.Add("Latest validation: ``$($continuityRuntime.validation.mostRecent.id)`` / ``$($continuityRuntime.validation.mostRecent.result)`` - $($continuityRuntime.validation.mostRecent.summary)")
+    }
+
     $runtimeMarkdownPath = Join-Path $bridgeDir 'context-runtime.md'
     ($sections -join "`r`n") + "`r`n" | Set-Content -LiteralPath $runtimeMarkdownPath -Encoding UTF8
 
@@ -272,7 +308,7 @@ function Assert-CheckpointShape {
             throw "Checkpoint field must not be empty: $field"
         }
     }
-    if ([int]$Checkpoint.schemaVersion -ne 1) {
+    if (@(1, 2) -notcontains [int]$Checkpoint.schemaVersion) {
         throw 'Unsupported checkpoint schemaVersion.'
     }
     if ([string]$Checkpoint.repository -ne $ExpectedRepository) {
@@ -292,6 +328,7 @@ function Assert-CheckpointShape {
             throw "Checkpoint field must be an array: $field"
         }
     }
+    Assert-ContinuityCheckpointShape -Checkpoint $Checkpoint -ExpectedRepository $ExpectedRepository
 }
 
 function Assert-NoSecrets {
@@ -350,7 +387,8 @@ function Convert-ToBullets {
 function New-CheckpointMarkdown {
     param([object]$Checkpoint, [object]$MemberState, [string]$GeneratedAt)
 
-    $lines = @(
+    $lines = New-Object System.Collections.Generic.List[string]
+    foreach ($line in @(
         '---',
         "date: $GeneratedAt",
         "status: $($Checkpoint.status)",
@@ -358,36 +396,36 @@ function New-CheckpointMarkdown {
         "branch: $($MemberState.branch)",
         "commit: $($MemberState.head)",
         "dirty: $($MemberState.dirty.ToString().ToLowerInvariant())",
-        '---',
-        '',
-        '# Objective',
-        '',
-        [string]$Checkpoint.objective,
-        '',
-        '# Confirmed Findings',
-        '',
-        (Convert-ToBullets -Items @($Checkpoint.confirmedFindings)),
-        '',
-        '# Decisions',
-        '',
-        (Convert-ToBullets -Items @($Checkpoint.decisions)),
-        '',
-        '# Rejected Approaches',
-        '',
-        (Convert-ToBullets -Items @($Checkpoint.rejectedApproaches)),
-        '',
-        '# Validation',
-        '',
-        (Convert-ToBullets -Items @($Checkpoint.validation)),
-        '',
-        '# Open Questions',
-        '',
-        (Convert-ToBullets -Items @($Checkpoint.openQuestions)),
-        '',
-        '# Next Action',
-        '',
-        [string]$Checkpoint.nextAction
-    )
+        "worktreeFingerprint: $($MemberState.fingerprint)",
+        '---', '', '# Objective', '', [string]$Checkpoint.objective, '',
+        '# Confirmed Findings', '', (Convert-ToBullets -Items @($Checkpoint.confirmedFindings)), '',
+        '# Decisions', '', (Convert-ToBullets -Items @($Checkpoint.decisions)), '',
+        '# Rejected Approaches', '', (Convert-ToBullets -Items @($Checkpoint.rejectedApproaches)), '',
+        '# Validation', '', (Convert-ToBullets -Items @($Checkpoint.validation)), '',
+        '# Open Questions', '', (Convert-ToBullets -Items @($Checkpoint.openQuestions)), ''
+    )) { $lines.Add($line) }
+
+    if ([int]$Checkpoint.schemaVersion -eq 2) {
+        $lines.Add('# Continuity')
+        $lines.Add('')
+        $lines.Add("Mode: ``$($Checkpoint.continuity.mode)``")
+        $lines.Add('')
+        if ($null -ne $Checkpoint.continuity.workstream) {
+            $lines.Add((Convert-ContinuityWorkstreamToMarkdown -Workstream $Checkpoint.continuity.workstream).TrimEnd())
+            $lines.Add('')
+        }
+        if (@($Checkpoint.continuity.validationLedger).Count -gt 0) {
+            $lines.Add('Validation ledger entries added by this checkpoint:')
+            $lines.Add('')
+            foreach ($entry in @($Checkpoint.continuity.validationLedger)) {
+                $lines.Add("- ``$($entry.id)`` ``$($entry.result)`` - $($entry.summary)")
+            }
+            $lines.Add('')
+        }
+    }
+    $lines.Add('# Next Action')
+    $lines.Add('')
+    $lines.Add([string]$Checkpoint.nextAction)
     return ($lines -join "`r`n")
 }
 
@@ -423,6 +461,8 @@ if ($contextState.branch -ne $expectedBranch) {
 
 $freshness = if ($contextState.dirty) {
     'DIRTY_LOCAL_CONTEXT'
+} elseif ($Offline) {
+    'OFFLINE_IMPORTED_CONTEXT'
 } elseif ($null -ne $contextState.ahead -and $null -ne $contextState.behind -and $contextState.ahead -gt 0 -and $contextState.behind -gt 0) {
     'DIVERGED_LOCAL_CONTEXT'
 } elseif ($null -ne $contextState.behind -and $contextState.behind -gt 0) {
@@ -447,6 +487,7 @@ if ($Action -eq 'checkpoint') {
     if ($contextState.dirty) {
         throw 'Automated checkpoint refused because the central context cache has pre-existing uncommitted changes.'
     }
+    $checkpointFreshness = if ($Offline) { 'OFFLINE_IMPORTED_CONTEXT' } else { 'CURRENT_OR_FETCHED' }
 
     $checkpointPath = Join-Path $memberRootFullPath '.ai-bridge/context-checkpoint.json'
     if (-not (Test-Path -LiteralPath $checkpointPath -PathType Leaf)) {
@@ -456,6 +497,7 @@ if ($Action -eq 'checkpoint') {
     $checkpoint = Get-Content -LiteralPath $checkpointPath -Raw | ConvertFrom-Json
     Assert-CheckpointShape -Checkpoint $checkpoint -ExpectedRepository ([string]$config.repository)
     Assert-NoSecrets -Value $checkpoint
+    Assert-ContinuityTransition -ContextRoot $contextRoot -Checkpoint $checkpoint -Repository ([string]$config.repository)
 
     $memberState = Get-GitState -Root $memberRootFullPath
     $now = Get-Date
@@ -471,6 +513,7 @@ if ($Action -eq 'checkpoint') {
     $stateRelative = "state/repositories/$repoId.md"
     $handoffRelative = "handoffs/repositories/$repoId.md"
     $manifestRelative = "manifests/repositories/$repoId.json"
+    $continuityResult = Write-ContinuityState -ContextRoot $contextRoot -Checkpoint $checkpoint -MemberState $memberState -GeneratedAt $generatedAt -SessionRelative $sessionRelative
 
     foreach ($relative in @($sessionRelative, $stateRelative, $handoffRelative, $manifestRelative)) {
         $parent = Split-Path -Parent (Join-Path $contextRoot $relative)
@@ -480,7 +523,22 @@ if ($Action -eq 'checkpoint') {
     $sessionText = New-CheckpointMarkdown -Checkpoint $checkpoint -MemberState $memberState -GeneratedAt $generatedAt
     Set-Content -LiteralPath (Join-Path $contextRoot $sessionRelative) -Value $sessionText -Encoding UTF8
 
-    $stateText = @(
+    $continuityLines = @()
+    if ($null -ne $continuityResult.Metadata) {
+        $continuityLines = @(
+            '## Continuity',
+            '',
+            ('Mode: `' + [string]$continuityResult.Metadata.mode + '`'),
+            ('Workstream: `' + $(if ($null -ne $continuityResult.Metadata.workstreamId) { [string]$continuityResult.Metadata.workstreamId } else { 'none' }) + '`'),
+            ('Workstream status: `' + $(if ($null -ne $continuityResult.Metadata.workstreamStatus) { [string]$continuityResult.Metadata.workstreamStatus } else { 'none' }) + '`'),
+            ('Current item: `' + $(if ($null -ne $continuityResult.Metadata.currentItemId) { [string]$continuityResult.Metadata.currentItemId } else { 'none' }) + '`'),
+            ('Workstream record: `' + $(if ($null -ne $continuityResult.Metadata.workstreamPath) { [string]$continuityResult.Metadata.workstreamPath } else { 'none' }) + '`'),
+            ('Validation ledger: `' + [string]$continuityResult.Metadata.validationLedgerPath + '`'),
+            ''
+        )
+    }
+
+    $stateLines = @(
         "# Repository State - $repoId",
         '',
         "Updated: $generatedAt",
@@ -488,6 +546,7 @@ if ($Action -eq 'checkpoint') {
         ('Branch: `' + [string]$memberState.branch + '`'),
         ('Commit: `' + [string]$memberState.head + '`'),
         ('Dirty: `' + [string]$memberState.dirty + '`'),
+        ('Worktree fingerprint: `' + [string]$memberState.fingerprint + '`'),
         '',
         '## Objective',
         '',
@@ -496,7 +555,10 @@ if ($Action -eq 'checkpoint') {
         '## Confirmed Findings',
         '',
         (Convert-ToBullets -Items @($checkpoint.confirmedFindings)),
-        '',
+        ''
+    )
+    $stateLines += $continuityLines
+    $stateLines += @(
         '## Open Questions',
         '',
         (Convert-ToBullets -Items @($checkpoint.openQuestions)),
@@ -506,10 +568,11 @@ if ($Action -eq 'checkpoint') {
         [string]$checkpoint.nextAction,
         '',
         ('Latest session: `' + $sessionRelative + '`')
-    ) -join "`r`n"
+    )
+    $stateText = $stateLines -join "`r`n"
     Set-Content -LiteralPath (Join-Path $contextRoot $stateRelative) -Value $stateText -Encoding UTF8
 
-    $handoffText = @(
+    $handoffLines = @(
         "# Repository Handoff - $repoId",
         '',
         "Updated: $generatedAt",
@@ -526,13 +589,17 @@ if ($Action -eq 'checkpoint') {
         '## Rejected Approaches',
         '',
         (Convert-ToBullets -Items @($checkpoint.rejectedApproaches)),
-        '',
+        ''
+    )
+    $handoffLines += $continuityLines
+    $handoffLines += @(
         '## Next Action',
         '',
         [string]$checkpoint.nextAction,
         '',
         ('Session: `' + $sessionRelative + '`')
-    ) -join "`r`n"
+    )
+    $handoffText = $handoffLines -join "`r`n"
     Set-Content -LiteralPath (Join-Path $contextRoot $handoffRelative) -Value $handoffText -Encoding UTF8
 
     $manifest = [ordered]@{
@@ -542,6 +609,7 @@ if ($Action -eq 'checkpoint') {
         branch = $memberState.branch
         commit = $memberState.head
         dirty = $memberState.dirty
+        worktreeFingerprint = $memberState.fingerprint
         upstream = $memberState.upstream
         ahead = $memberState.ahead
         behind = $memberState.behind
@@ -549,24 +617,28 @@ if ($Action -eq 'checkpoint') {
         scope = [string]$checkpoint.scope
         session = $sessionRelative
     }
-    $manifest | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $contextRoot $manifestRelative) -Encoding UTF8
+    if ($null -ne $continuityResult.Metadata) {
+        $manifest['continuity'] = $continuityResult.Metadata
+    }
+    $manifest | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $contextRoot $manifestRelative) -Encoding UTF8
 
-    $pathsToCommit = @($sessionRelative, $stateRelative, $handoffRelative, $manifestRelative)
+    $pathsToCommit = @($sessionRelative, $stateRelative, $handoffRelative, $manifestRelative) + @($continuityResult.Paths)
+    $pathsToCommit = @($pathsToCommit | Select-Object -Unique)
     Invoke-Git -WorkingDirectory $contextRoot -Arguments (@('add', '--') + $pathsToCommit) | Out-Null
     Invoke-Git -WorkingDirectory $contextRoot -Arguments @('diff', '--cached', '--check') | Out-Null
 
     $staged = (Invoke-Git -WorkingDirectory $contextRoot -Arguments @('diff', '--cached', '--name-only')).Output
     if ([string]::IsNullOrWhiteSpace($staged)) {
         Remove-Item -LiteralPath $checkpointPath -Force
-        Write-RuntimeBundle -MemberRoot $memberRootFullPath -ContextRoot $contextRoot -Config $config -ContextFreshness 'CURRENT_OR_FETCHED' | Out-Null
+        Write-RuntimeBundle -MemberRoot $memberRootFullPath -ContextRoot $contextRoot -Config $config -ContextFreshness $checkpointFreshness | Out-Null
         Write-Output 'AI context checkpoint produced no changes.'
         exit 0
     }
 
     $message = "chore(context): checkpoint $repoId $scopeSlug"
-    Invoke-Git -WorkingDirectory $contextRoot -Arguments @('commit', '-m', $message, '--', $sessionRelative, $stateRelative, $handoffRelative, $manifestRelative) | Out-Null
+    Invoke-Git -WorkingDirectory $contextRoot -Arguments (@('commit', '-m', $message, '--') + $pathsToCommit) | Out-Null
 
-    if ([bool]$config.behavior.pushContext) {
+    if (-not $Offline -and [bool]$config.behavior.pushContext) {
         $push = Invoke-GitNetwork -WorkingDirectory $contextRoot -Arguments @('push', 'origin', "HEAD:$expectedBranch") -Remote $contextRemote -AllowFailure
         if ($push.ExitCode -ne 0) {
             Invoke-GitNetwork -WorkingDirectory $contextRoot -Arguments @('fetch', 'origin', $expectedBranch) -Remote $contextRemote | Out-Null
@@ -580,6 +652,6 @@ if ($Action -eq 'checkpoint') {
     }
 
     Remove-Item -LiteralPath $checkpointPath -Force
-    $runtime = Write-RuntimeBundle -MemberRoot $memberRootFullPath -ContextRoot $contextRoot -Config $config -ContextFreshness 'CURRENT_OR_FETCHED'
+    $runtime = Write-RuntimeBundle -MemberRoot $memberRootFullPath -ContextRoot $contextRoot -Config $config -ContextFreshness $checkpointFreshness
     Write-Output "AI context checkpoint committed: $($runtime.context.head)"
 }
