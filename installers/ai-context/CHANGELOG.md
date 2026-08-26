@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.2.1
+
+- Fix offline export on real installed central-context repositories by keeping canonical secret-rejection fixtures semantically equivalent while avoiding literal secret-like tokens in the tracked test source itself.
+- Extend lifecycle regression fixtures so offline export scans the canonical PowerShell/POSIX lifecycle test files, preventing recurrence of this false-positive release defect.
+
 ## 1.2.0
 
 - Add Continuity v2 tracked workstreams with stable work-item IDs, execution cursor, repository roles, dependencies/blockers, acceptance criteria, validation requirements, and archived terminal workstreams.

@@ -82,8 +82,11 @@ function New-TestEnvironment {
         Set-Content -LiteralPath $target -Value $entry.Value -Encoding UTF8
     }
     New-Item -ItemType Directory -Path (Join-Path $contextSeed 'tooling') -Force | Out-Null
+    New-Item -ItemType Directory -Path (Join-Path $contextSeed 'tests') -Force | Out-Null
     Copy-Item -LiteralPath $centralTool -Destination (Join-Path $contextSeed 'tooling/context-lifecycle.ps1')
     Copy-Item -LiteralPath $centralContinuityTool -Destination (Join-Path $contextSeed 'tooling/context-continuity.ps1')
+    Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'context-lifecycle.tests.ps1') -Destination (Join-Path $contextSeed 'tests/context-lifecycle.tests.ps1')
+    Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'context-lifecycle.tests.sh') -Destination (Join-Path $contextSeed 'tests/context-lifecycle.tests.sh')
     Invoke-Git -Root $contextSeed -Arguments @('add', '--all') | Out-Null
     Invoke-Git -Root $contextSeed -Arguments @('commit', '-m', 'seed context') | Out-Null
     Invoke-Git -Root $contextSeed -Arguments @('remote', 'add', 'origin', $contextBare) | Out-Null
@@ -398,7 +401,8 @@ $tests += @{ Name = 'secret-like material is rejected without committing'; Run =
     $env = New-TestEnvironment -Name 'secret'
     try {
         Invoke-Launcher -Env $env -Action 'start'
-        Write-ValidCheckpoint -Env $env -Objective 'Bearer abcdefghijklmnopqrstuvwxyz'
+        $secretLike = 'Bear' + 'er ' + 'abcdefghijklmnopqrstuvwxyz'
+        Write-ValidCheckpoint -Env $env -Objective $secretLike
         $result = Invoke-LauncherAllowFailure -Env $env -Action 'checkpoint'
         Assert-True -Condition ($result.ExitCode -ne 0) -Message 'Secret-like content must fail.'
         Assert-True -Condition ($result.Output -like '*secret-like material*') -Message 'Secret failure should be explicit without echoing the secret.'
@@ -743,7 +747,8 @@ $tests += @{ Name = 'offline export rejects secret-like tracked context material
     try {
         Invoke-Launcher -Env $env -Action 'start'
         Initialize-GitIdentity -Root $env.Cache
-        Set-Content -LiteralPath (Join-Path $env.Cache 'secret-fixture.md') -Value 'Bearer abcdefghijklmnop' -Encoding UTF8
+        $secretLike = 'Bear' + 'er ' + 'abcdefghijklmnop'
+        Set-Content -LiteralPath (Join-Path $env.Cache 'secret-fixture.md') -Value $secretLike -Encoding UTF8
         Invoke-Git -Root $env.Cache -Arguments @('add', 'secret-fixture.md') | Out-Null
         Invoke-Git -Root $env.Cache -Arguments @('commit', '-m', 'secret fixture') | Out-Null
         $result = Invoke-LauncherAllowFailure -Env $env -Action 'export'

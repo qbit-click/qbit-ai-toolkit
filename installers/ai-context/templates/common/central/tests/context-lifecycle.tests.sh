@@ -20,8 +20,10 @@ git_identity() {
 
 seed_central() {
   local repo=$1
-  mkdir -p "$repo/project" "$repo/state" "$repo/repositories" "$repo/tooling"
+  mkdir -p "$repo/project" "$repo/state" "$repo/repositories" "$repo/tooling" "$repo/tests"
   cp "$central_root/tooling/context-lifecycle.py" "$repo/tooling/context-lifecycle.py"
+  cp "$here/context-lifecycle.tests.ps1" "$repo/tests/context-lifecycle.tests.ps1"
+  cp "$here/context-lifecycle.tests.sh" "$repo/tests/context-lifecycle.tests.sh"
   cat >"$repo/AI_CONTEXT.md" <<'EOF'
 # AI Context Entry Point
 EOF
@@ -243,9 +245,9 @@ test_secret_rejected() {
   bash "$member/.ai/context/context.sh" start >/dev/null
   git -C "$member/.ai/context/cache/project-context" config user.name "AI Context Test"
   git -C "$member/.ai/context/cache/project-context" config user.email "ai-context-test@local.invalid"
-  cat >"$member/.ai-bridge/context-checkpoint.json" <<'EOF'
-{"schemaVersion":1,"repository":"test-member","scope":"bad","status":"VALIDATED","objective":"Bearer abcdefghijklmnop","confirmedFindings":[],"decisions":[],"rejectedApproaches":[],"validation":[],"openQuestions":[],"nextAction":"x"}
-EOF
+  local secret_like
+  secret_like='Bear''er abcdefghijklmnop'
+  printf '{"schemaVersion":1,"repository":"test-member","scope":"bad","status":"VALIDATED","objective":"%s","confirmedFindings":[],"decisions":[],"rejectedApproaches":[],"validation":[],"openQuestions":[],"nextAction":"x"}\n' "$secret_like" >"$member/.ai-bridge/context-checkpoint.json"
   if bash "$member/.ai/context/context.sh" checkpoint >/dev/null 2>&1; then return 1; fi
   [[ -f "$member/.ai-bridge/context-checkpoint.json" ]]
 }
@@ -739,7 +741,9 @@ test_offline_secret_export_rejected() {
   bash "$member/.ai/context/context.sh" start >/dev/null
   cache="$member/.ai/context/cache/project-context"
   git_identity "$cache"
-  printf 'Bearer abcdefghijklmnop\n' >"$cache/secret-fixture.md"
+  local secret_like
+  secret_like='Bear''er abcdefghijklmnop'
+  printf '%s\n' "$secret_like" >"$cache/secret-fixture.md"
   git -C "$cache" add secret-fixture.md
   git -C "$cache" commit -m 'secret fixture' >/dev/null
   if out=$(bash "$member/.ai/context/context.sh" export 2>&1); then return 1; fi
