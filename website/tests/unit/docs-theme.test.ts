@@ -4,8 +4,21 @@ import {describe, expect, it} from 'vitest';
 
 const config = readFileSync(resolve(process.cwd(), 'docusaurus.config.ts'), 'utf8');
 const css = readFileSync(resolve(process.cwd(), 'src/css/custom.css'), 'utf8');
+const template = JSON.parse(readFileSync(resolve(process.cwd(), 'template.manifest.json'), 'utf8'));
 
 describe('documentation platform contract', () => {
+  it('publishes the canonical Qbit documentation template manifest', () => {
+    expect(template.schemaVersion).toBe(1);
+    expect(template.template).toBe('qbit-documentation');
+    expect(template.templateVersion).toBe('1.0.0');
+    expect(template.source).toEqual({
+      repository: 'https://github.com/qbit-click/qbit-ai-toolkit.git',
+      path: 'website',
+    });
+    expect(template.sharedFiles).toContain('src/css/custom.css');
+    expect(template.sharedFiles).toContain('src/pages/index.module.css');
+  });
+
   it('keeps bilingual Docusaurus search enabled', () => {
     expect(config).toContain("locales: ['en', 'fa']");
     expect(config).toContain("'@easyops-cn/docusaurus-search-local'");

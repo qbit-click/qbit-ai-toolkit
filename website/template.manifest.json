@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "template": "qbit-documentation",
+  "templateVersion": "1.0.0",
+  "source": {
+    "repository": "https://github.com/qbit-click/qbit-ai-toolkit.git",
+    "path": "website"
+  },
+  "toolchain": {
+    "packageManager": "bun@1.4.0",
+    "docusaurus": "3.10.2",
+    "docusaurusFaster": "3.10.2",
+    "react": "^19.0.0",
+    "typescript": "~6.0.2",
+    "search": "@easyops-cn/docusaurus-search-local@0.55.3",
+    "font": "@fontsource-variable/vazirmatn@5.3.0",
+    "vitest": "4.1.11",
+    "playwright": "1.62.1"
+  },
+  "sharedFiles": [
+    "src/css/custom.css",
+    "src/pages/index.module.css",
+    "playwright.config.ts",
+    "vitest.config.mts"
+  ],
+  "structuralFiles": [
+    "docusaurus.config.ts",
+    "package.json",
+    "sidebars.ts",
+    "src/pages/index.tsx",
+    "tests/unit",
+    "tests/integration",
+    "tests/e2e"
+  ],
+  "allowedProductOverrides": [
+    "site title, tagline, metadata, repository URLs, and logo assets",
+    "documentation content and sidebars",
+    "homepage copy, domain labels, product-specific terminal content, and CTA routes",
+    "default locale and locale URL prefix",
+    "docs routeBasePath and docsDir",
+    "GitHub Pages/custom-domain baseUrl and preview port",
+    "deployment workflow paths and working directories"
+  ]
+}
