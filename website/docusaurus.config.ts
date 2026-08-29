@@ -54,6 +54,22 @@ const config: Config = {
     ],
   ],
 
+  themes: [
+    [
+      '@easyops-cn/docusaurus-search-local',
+      {
+        hashed: 'filename',
+        indexDocs: true,
+        indexBlog: false,
+        indexPages: true,
+        docsRouteBasePath: '/',
+        docsDir: '../docs',
+        highlightSearchTermsOnTargetPage: true,
+        explicitSearchResultPath: true,
+      },
+    ],
+  ],
+
   themeConfig: {
     metadata: [
       {name: 'description', content: 'Qbit AI Toolkit documentation for AI development tooling, installers, architecture, security, and maintenance.'},

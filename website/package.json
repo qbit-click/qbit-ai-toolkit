@@ -2,24 +2,30 @@
   "name": "qbit-ai-toolkit-docs",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "bun@1.4.0",
   "scripts": {
     "start": "docusaurus start",
     "start:fa": "docusaurus start --locale fa",
-    "preview": "docusaurus serve --build --host 127.0.0.1 --port 3000",
+    "preview": "docusaurus serve --build --host 127.0.0.1 --port 43177",
     "build": "docusaurus build",
     "serve": "docusaurus serve",
     "clear": "docusaurus clear",
     "typecheck": "tsc --noEmit",
+    "test:unit": "vitest run tests/unit",
+    "test:integration": "bun run build && vitest run tests/integration",
+    "test:e2e": "playwright test",
+    "check": "bun run typecheck && bun run test:unit && bun run test:integration && bun run test:e2e",
     "write-translations": "docusaurus write-translations"
   },
   "dependencies": {
     "@docusaurus/core": "3.10.2",
     "@docusaurus/faster": "3.10.2",
     "@docusaurus/preset-classic": "3.10.2",
+    "@easyops-cn/docusaurus-search-local": "0.55.3",
     "@fontsource-variable/vazirmatn": "5.3.0",
     "@mdx-js/react": "^3.0.0",
     "clsx": "^2.0.0",
-    "prism-react-renderer": "^2.3.0",
+    "prism-react-renderer": "^2.4.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
@@ -27,8 +33,11 @@
     "@docusaurus/module-type-aliases": "3.10.2",
     "@docusaurus/tsconfig": "3.10.2",
     "@docusaurus/types": "3.10.2",
+    "@playwright/test": "1.62.1",
+    "@types/node": "26.4.0",
     "@types/react": "^19.0.0",
-    "typescript": "~6.0.2"
+    "typescript": "~6.0.2",
+    "vitest": "4.1.11"
   },
   "engines": {
     "node": ">=20.0"

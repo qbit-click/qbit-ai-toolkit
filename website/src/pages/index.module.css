@@ -4,13 +4,13 @@
 }
 
 .shell {
-  width: min(1180px, calc(100% - 2rem));
-  margin: 0 auto;
+  width: min(1152px, calc(100% - 2rem));
+  margin-inline: auto;
 }
 
 .hero {
   position: relative;
-  padding: 7rem 0 5.5rem;
+  padding: 72px 0 56px;
   border-bottom: 1px solid var(--ifm-color-emphasis-200);
   background:
     linear-gradient(180deg, color-mix(in srgb, var(--ifm-color-primary) 7%, transparent), transparent 68%),
@@ -76,9 +76,9 @@
 
 .heroCopy h1 {
   margin: 0;
-  font-size: clamp(2.6rem, 5.5vw, 5rem);
-  line-height: 0.98;
-  letter-spacing: -0.045em;
+  font-size: clamp(2.25rem, 4vw, 3rem);
+  line-height: 1.12;
+  letter-spacing: -0.02em;
   text-wrap: balance;
 }
 
