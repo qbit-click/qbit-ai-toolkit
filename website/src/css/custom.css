@@ -92,6 +92,13 @@ html[dir='rtl'] table {
   background-color: var(--ifm-background-surface-color);
 }
 
+html[dir='rtl'] .navbar__search,
+html[dir='rtl'] .navbar__search-input {
+  /* rtl:ignore */
+  direction: rtl;
+  text-align: start;
+}
+
 .navbar__search-input:focus {
   border-color: var(--ifm-color-primary);
   box-shadow: none;

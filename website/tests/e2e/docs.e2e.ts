@@ -23,6 +23,12 @@ test('Persian documentation is available as RTL', async ({page}) => {
   await expect(page.getByText('تولکیت مهندسی AI با رویکرد documentation-first')).toBeVisible();
   await expect(page.locator('.navbar__search-input')).toBeVisible();
 
+  const searchDirection = await page.locator('.navbar__search-input').evaluate((node) => {
+    const style = getComputedStyle(node);
+    return {direction: style.direction, textAlign: style.textAlign};
+  });
+  expect(searchDirection).toEqual({direction: 'rtl', textAlign: 'right'});
+
   const logoSpacing = await page.locator('.navbar__logo').evaluate((node) => {
     const style = getComputedStyle(node);
     return {left: style.marginLeft, right: style.marginRight};

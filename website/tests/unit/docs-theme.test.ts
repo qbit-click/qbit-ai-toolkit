@@ -21,6 +21,8 @@ describe('documentation platform contract', () => {
     expect(css).toContain('margin-inline');
     expect(css).toContain('border-inline-end');
     expect(css).toContain('text-align: start');
+    expect(css).toContain("html[dir='rtl'] .navbar__search");
+    expect(css).toContain('direction: rtl');
 
     for (const pattern of [
       /\bpadding-(?:left|right)\s*:/g,
