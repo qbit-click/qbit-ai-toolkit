@@ -40,8 +40,11 @@ EOF
 Continue validated work.
 EOF
   cat >"$repo/repositories/repositories.yaml" <<'EOF'
-project: test
-repositories: {}
+project: test-project
+repositories:
+  test-member:
+    path: ../member
+    role: implementation-owner
 EOF
 }
 
@@ -799,6 +802,83 @@ PY
   [[ -f "$member_b/.ai-bridge/context-offline.json" ]]
 }
 
+test_unregistered_member_rejected() {
+  local root member out
+  root=$(mktemp -d)
+  member=$(make_fixture "$root")
+  cat >"$root/central/repositories/repositories.yaml" <<'EOF'
+project: test-project
+repositories: {}
+EOF
+  git -C "$root/central" add repositories/repositories.yaml
+  git -C "$root/central" commit -m 'remove member registration' >/dev/null
+  git -C "$root/central" push origin main >/dev/null
+  if out=$(bash "$member/.ai/context/context.sh" start 2>&1); then return 1; fi
+  [[ "$out" == *'not registered'* ]]
+  [[ ! -f "$member/.ai-bridge/context-runtime.json" ]]
+  if out=$(bash "$member/.ai/context/context.sh" status 2>&1); then return 1; fi
+  [[ "$out" == *'"registered": false'* ]]
+  cat >"$member/.ai-bridge/context-checkpoint.json" <<'EOF'
+{"schemaVersion":1,"repository":"test-member","scope":"unregistered","status":"VALIDATED","objective":"Reject unregistered member.","confirmedFindings":[],"decisions":[],"rejectedApproaches":[],"validation":[],"openQuestions":[],"nextAction":"Register first."}
+EOF
+  if bash "$member/.ai/context/context.sh" checkpoint >/dev/null 2>&1; then return 1; fi
+  [[ -f "$member/.ai-bridge/context-checkpoint.json" ]]
+  [[ ! -f "$member/.ai/context/cache/project-context/state/repositories/test-member.md" ]]
+}
+
+test_membership_audit_reports_candidate_without_mutation() {
+  local root member candidate before after out
+  root=$(mktemp -d)
+  member=$(make_fixture "$root")
+  candidate="$root/test-project-docs"
+  git init -b main "$candidate" >/dev/null
+  git_identity "$candidate"
+  printf '# Candidate\n' >"$candidate/AI_CONTEXT.md"
+  git -C "$candidate" add AI_CONTEXT.md
+  git -C "$candidate" commit -m candidate >/dev/null
+  before=$(git --git-dir "$root/context.git" rev-parse refs/heads/main)
+  out=$(bash "$member/.ai/context/context.sh" audit)
+  after=$(git --git-dir "$root/context.git" rev-parse refs/heads/main)
+  [[ "$out" == *'"repository": "test-project-docs"'* ]]
+  [[ "$out" == *'"candidates":'* ]]
+  [[ "$before" == "$after" ]]
+}
+
+test_online_checkpoint_divergence_rejected_without_rebase() {
+  local root member cache remote_writer hook local_head remote_head out writer_path
+  root=$(mktemp -d)
+  member=$(make_fixture "$root")
+  bash "$member/.ai/context/context.sh" start >/dev/null
+  cache="$member/.ai/context/cache/project-context"
+  git_identity "$cache"
+  remote_writer="$root/remote-writer-online"
+  git clone --branch main --single-branch "$root/context.git" "$remote_writer" >/dev/null 2>&1
+  git_identity "$remote_writer"
+  writer_path=$(native_path "$remote_writer")
+  hook="$cache/.git/hooks/pre-push"
+  cat >"$hook" <<EOF
+#!/usr/bin/env bash
+rm -f -- "\$0"
+printf 'remote race\n' >"$writer_path/online-race-remote.md"
+git -C "$writer_path" add online-race-remote.md
+git -C "$writer_path" commit -m 'remote online race' >/dev/null
+git -C "$writer_path" push origin main >/dev/null
+EOF
+  chmod +x "$hook"
+  cat >"$member/.ai-bridge/context-checkpoint.json" <<'EOF'
+{"schemaVersion":1,"repository":"test-member","scope":"online-race","status":"VALIDATED","objective":"Prove online divergence is fail-closed.","confirmedFindings":[],"decisions":[],"rejectedApproaches":[],"validation":[],"openQuestions":[],"nextAction":"Reconcile explicitly."}
+EOF
+  if out=$(bash "$member/.ai/context/context.sh" checkpoint 2>&1); then return 1; fi
+  [[ "$out" == *'histories diverged'* ]]
+  [[ -f "$member/.ai-bridge/context-checkpoint.json" ]]
+  local_head=$(git -C "$cache" rev-parse HEAD)
+  remote_head=$(git --git-dir "$root/context.git" rev-parse refs/heads/main)
+  [[ "$local_head" != "$remote_head" ]]
+  if git -C "$cache" merge-base --is-ancestor "$local_head" "$remote_head"; then return 1; fi
+  if git -C "$cache" merge-base --is-ancestor "$remote_head" "$local_head"; then return 1; fi
+  [[ ! -d "$cache/.git/rebase-merge" && ! -d "$cache/.git/rebase-apply" ]]
+}
+
 test_cache_escape_rejected() {
   local root member config escaped
   root=$(mktemp -d)
@@ -842,6 +922,9 @@ run_test 'offline transfer repository mismatch is rejected' test_offline_transfe
 run_test 'offline import rejects conflicting existing context head without reconciliation' test_offline_conflict_rejected
 run_test 'offline export rejects secret-like tracked context material' test_offline_secret_export_rejected
 run_test 'offline reconnect rejects divergent local and remote writers without mutation' test_offline_reconnect_divergence_rejected
+run_test 'unregistered member start status and checkpoint fail closed' test_unregistered_member_rejected
+run_test 'membership audit reports candidates without mutation' test_membership_audit_reports_candidate_without_mutation
+run_test 'online checkpoint divergence rejects without rebase' test_online_checkpoint_divergence_rejected_without_rebase
 run_test 'cache path escape is rejected before filesystem mutation' test_cache_escape_rejected
 
 if (( fail > 0 )); then

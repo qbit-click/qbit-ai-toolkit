@@ -36,6 +36,14 @@ Test 'managed file hash normalizes UTF-8 BOM and line endings' {
     Assert ((Get-FileSha256 $Bom) -eq $Expected) 'UTF-8 BOM was not normalized'
   } finally {Remove-Item -LiteralPath $Root -Recurse -Force -ErrorAction SilentlyContinue}
 }
+Test 'rendered lifecycle exposes audit and forbids automatic rebase' {
+  $V=Get-Variables 'demo' 'Demo' 'demo-ai-context' 'demo-ai-context' 'https://github.com/example/demo-ai-context.git' 'main';$S=New-Spec 'central' $V
+  $PowerShell=[string]$S.Files['tooling/context-lifecycle.ps1'];$Python=[string]$S.Files['tooling/context-lifecycle.py']
+  Assert ($PowerShell.Contains("'audit'")) 'PowerShell lifecycle does not expose audit'
+  Assert ($Python.Contains('"audit"')) 'Python lifecycle does not expose audit'
+  Assert (-not $PowerShell.Contains("@('rebase'")) 'PowerShell lifecycle still contains automatic rebase command'
+  Assert (-not $Python.Contains('["rebase",')) 'Python lifecycle still contains automatic rebase command'
+}
 
 if($Failed -gt 0){throw "$Failed unit test(s) failed; $Passed passed."}
 Write-Host "PASS all $Passed AI Context installer unit tests"

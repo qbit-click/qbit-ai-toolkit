@@ -5,7 +5,7 @@ sidebar_label: Continuity v2
 
 # AI Context Continuity v2
 
-Continuity v2 مدل durable برای نگهداری context پروژه است که توسط `installer.ai-context` ارائه می‌شود. نسخه پایدار فعلی `1.2.2` است. هدف آن این است که کار repository در session، اکانت، ماشین یا دوره آفلاین جدید دقیقاً قابل ادامه باشد، بدون اینکه تاریخچه chat به منبع اصلی حقیقت تبدیل شود.
+Continuity v2 مدل durable برای نگهداری context پروژه است که توسط `installer.ai-context` ارائه می‌شود. نسخه پایدار فعلی `1.2.3` است. هدف آن این است که کار repository در session، اکانت، ماشین یا دوره آفلاین جدید دقیقاً قابل ادامه باشد، بدون اینکه تاریخچه chat به منبع اصلی حقیقت تبدیل شود.
 
 ## محدوده و مرجعیت
 
@@ -92,6 +92,7 @@ Repositoryهای managed روی Windows و POSIX همین actionها را دار
 start
 status
 checkpoint
+audit
 export
 import
 reconnect
@@ -109,9 +110,11 @@ Linux/macOS:
 bash .ai/context/context.sh start
 ```
 
-قبل از substantive work یک بار `start` را اجرا کنید و `.ai-bridge/context-runtime.md` را بخوانید. Active workstream، cursor، unresolved itemها و validation freshness داخل آن resume contract هستند.
+قبل از substantive work یک بار `start` را اجرا کنید و `.ai-bridge/context-runtime.md` را بخوانید. Active workstream، cursor، unresolved itemها، validation freshness و membership diagnostics داخل آن resume contract هستند.
 
-بعد از milestone substantive و validated که continuity durable را تغییر می‌دهد، `.ai-bridge/context-checkpoint.json` را بسازید و `checkpoint` اجرا کنید. سؤال‌های read-only یا هر پیام chat نیاز به checkpoint ندارند.
+Membership در central context صریح است. `repositories/repositories.yaml` فهرست repositoryهای managed و role آن‌ها را نگه می‌دارد. Member config باید همان project ID را داشته باشد و repository ID آن در registry ثبت شده باشد. Repository ثبت‌نشده در `start` و `checkpoint` fail-closed می‌شود؛ `status` همچنان runtime diagnostic تولید می‌کند، اما با وضعیت unhealthy خارج می‌شود. Action `audit` کاملاً read-only است و registry را با Git worktreeهای نزدیک مقایسه می‌کند تا memberهای missing/mismatched و siblingهای محتملِ ثبت‌نشده را بدون auto-register یا mutation تاریخچه گزارش کند.
+
+بعد از milestone substantive و validated که continuity durable را تغییر می‌دهد، `.ai-bridge/context-checkpoint.json` را بسازید و `checkpoint` اجرا کنید. سؤال‌های read-only یا هر پیام chat نیاز به checkpoint ندارند. Publication آنلاین checkpoint بر پایه ancestry است: بعد از push rejection، lifecycle branch تنظیم‌شده را fetch می‌کند و فقط وقتی یکی از historyها ancestor دیگری باشد retry یا fast-forward انجام می‌دهد. اگر هر دو history مستقل جلو رفته باشند، operation fail-closed می‌شود و هر دو history حفظ می‌شوند؛ checkpoint هیچ‌وقت به‌صورت خودکار merge، rebase، reset یا force-push نمی‌کند.
 
 ## انتقال آفلاین و بین ماشین‌ها
 

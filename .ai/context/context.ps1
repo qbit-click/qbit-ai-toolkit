@@ -1,6 +1,6 @@
 param(
     [Parameter(Position = 0)]
-    [ValidateSet('start', 'status', 'checkpoint', 'export', 'import', 'reconnect')]
+    [ValidateSet('start', 'status', 'checkpoint', 'audit', 'export', 'import', 'reconnect')]
     [string]$Action = 'start'
 )
 

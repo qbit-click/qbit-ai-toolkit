@@ -15,6 +15,15 @@ import sys
 sys.modules[SPEC.name] = installer
 SPEC.loader.exec_module(installer)
 
+LIFECYCLE_SPEC = importlib.util.spec_from_file_location(
+    "ai_context_lifecycle",
+    ROOT / "templates" / "common" / "central" / "tooling" / "context-lifecycle.py",
+)
+assert LIFECYCLE_SPEC and LIFECYCLE_SPEC.loader
+lifecycle = importlib.util.module_from_spec(LIFECYCLE_SPEC)
+sys.modules[LIFECYCLE_SPEC.name] = lifecycle
+LIFECYCLE_SPEC.loader.exec_module(lifecycle)
+
 
 class AiContextPosixUnitTests(unittest.TestCase):
     def test_safe_id_and_branch_validation(self) -> None:
@@ -98,6 +107,51 @@ class AiContextPosixUnitTests(unittest.TestCase):
         self.assertIn("tooling/context-lifecycle.py", spec.files)
         self.assertIn("tests/context-lifecycle.tests.ps1", spec.files)
         self.assertIn("tests/context-lifecycle.tests.sh", spec.files)
+
+    def test_repository_registry_membership_is_explicit_and_fail_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            registry = root / "repositories" / "repositories.yaml"
+            registry.parent.mkdir(parents=True)
+            registry.write_text(
+                "project: demo\n"
+                "repositories:\n"
+                "  demo-api:\n"
+                "    path: ../demo-api\n"
+                "    role: application-member\n",
+                encoding="utf-8",
+            )
+            config = {"project": "demo", "repository": "demo-api"}
+            info = lifecycle.membership_info(root, config)
+            self.assertTrue(info["registered"])
+            self.assertTrue(info["projectMatches"])
+            self.assertEqual(info["role"], "application-member")
+            self.assertEqual(info["path"], "../demo-api")
+
+            missing = lifecycle.membership_info(root, {"project": "demo", "repository": "demo-worker"})
+            self.assertFalse(missing["registered"])
+            self.assertIn("not registered", str(missing["issue"]))
+            with self.assertRaisesRegex(RuntimeError, "not registered"):
+                lifecycle.require_registered_member(root, {"project": "demo", "repository": "demo-worker"})
+
+    def test_repository_registry_rejects_member_without_role(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            registry = root / "repositories" / "repositories.yaml"
+            registry.parent.mkdir(parents=True)
+            registry.write_text("project: demo\nrepositories:\n  demo-api:\n    path: ../demo-api\n", encoding="utf-8")
+            with self.assertRaisesRegex(RuntimeError, "missing required role"):
+                lifecycle.load_repository_registry(root)
+
+    def test_rendered_lifecycle_exposes_audit_and_forbids_automatic_rebase(self) -> None:
+        values = installer.values("demo", "Demo", "demo-ai-context", "demo-ai-context", "https://example.invalid/context.git", "main")
+        central = installer.new_spec("central", values)
+        powershell = central.files["tooling/context-lifecycle.ps1"]
+        python = central.files["tooling/context-lifecycle.py"]
+        self.assertIn("'audit'", powershell)
+        self.assertIn('"audit"', python)
+        self.assertNotIn("@('rebase'", powershell)
+        self.assertNotIn('["rebase",', python)
 
 
 if __name__ == "__main__":

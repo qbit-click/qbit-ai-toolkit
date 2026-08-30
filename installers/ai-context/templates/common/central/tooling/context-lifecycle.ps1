@@ -1,6 +1,6 @@
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('start', 'status', 'checkpoint')]
+    [ValidateSet('start', 'status', 'checkpoint', 'audit')]
     [string]$Action,
 
     [Parameter(Mandatory = $true)]
@@ -157,6 +157,209 @@ function Assert-RequiredContextFiles {
     }
 }
 
+function Normalize-RegistryValue {
+    param([string]$Raw, [string]$Label)
+    $value = $Raw.Trim()
+    if ([string]::IsNullOrWhiteSpace($value)) { throw "Repository registry $Label must not be empty." }
+    if (($value.StartsWith('"') -and $value.EndsWith('"')) -or ($value.StartsWith("'") -and $value.EndsWith("'"))) {
+        if ($value.Length -lt 2) { throw "Repository registry $Label has invalid quoted scalar syntax." }
+        $value = $value.Substring(1, $value.Length - 2)
+    }
+    if ([string]::IsNullOrWhiteSpace($value)) { throw "Repository registry $Label must not be empty." }
+    return $value
+}
+
+function Get-RepositoryRegistry {
+    param([string]$ContextRoot)
+    $path = Join-Path $ContextRoot 'repositories/repositories.yaml'
+    $project = $null
+    $repositories = [ordered]@{}
+    $inRepositories = $false
+    $sawRepositories = $false
+    $currentRepository = $null
+    $currentRole = $null
+    $currentPath = $null
+
+    foreach ($line in @(Get-Content -LiteralPath $path)) {
+        $text = [string]$line
+        if ($text.Contains("`t")) { throw 'Repository registry must not use tab indentation.' }
+        if ([string]::IsNullOrWhiteSpace($text) -or $text.TrimStart().StartsWith('#')) { continue }
+
+        if ($inRepositories -and -not $text.StartsWith(' ')) {
+            if ($null -ne $currentRepository) {
+                if ([string]::IsNullOrWhiteSpace($currentRole)) { throw "Repository registry entry '$currentRepository' is missing required role." }
+                $repositories[$currentRepository] = [ordered]@{ role = $currentRole; path = $currentPath }
+                $currentRepository = $null; $currentRole = $null; $currentPath = $null
+            }
+            $inRepositories = $false
+        }
+
+        if ($inRepositories) {
+            if ($text -match '^  ([A-Za-z0-9][A-Za-z0-9._-]{0,127}):\s*\z') {
+                if ($null -ne $currentRepository) {
+                    if ([string]::IsNullOrWhiteSpace($currentRole)) { throw "Repository registry entry '$currentRepository' is missing required role." }
+                    $repositories[$currentRepository] = [ordered]@{ role = $currentRole; path = $currentPath }
+                }
+                $repoId = [string]$Matches[1]
+                if ($repositories.Contains($repoId)) { throw "Repository registry contains duplicate repository id '$repoId'." }
+                $currentRepository = $repoId; $currentRole = $null; $currentPath = $null
+                continue
+            }
+            if ($null -ne $currentRepository -and $text -match '^    (path|role):\s*(.+)\z') {
+                $field = [string]$Matches[1]
+                $value = Normalize-RegistryValue -Raw ([string]$Matches[2]) -Label "$currentRepository.$field"
+                if ($field -eq 'role') {
+                    if ($null -ne $currentRole) { throw "Repository registry entry '$currentRepository' contains duplicate role." }
+                    $currentRole = $value
+                } else {
+                    if ($null -ne $currentPath) { throw "Repository registry entry '$currentRepository' contains duplicate path." }
+                    $currentPath = $value
+                }
+                continue
+            }
+            throw "Repository registry has unsupported repositories structure: $text"
+        }
+
+        if ($text -match '^project:\s*(.+)\z') {
+            if ($null -ne $project) { throw 'Repository registry contains duplicate project field.' }
+            $project = Normalize-RegistryValue -Raw ([string]$Matches[1]) -Label 'project'
+            continue
+        }
+        if ($text -match '^repositories:\s*(.*)\z') {
+            if ($sawRepositories) { throw 'Repository registry contains duplicate repositories field.' }
+            $sawRepositories = $true
+            $value = ([string]$Matches[1]).Trim()
+            if ([string]::IsNullOrWhiteSpace($value)) { $inRepositories = $true; continue }
+            if ($value -eq '[]' -or $value -eq '{}') { continue }
+            throw 'Repository registry repositories field must be an indented mapping, [] or {}.'
+        }
+        if ($text -match '^(schema_version|workspace_root|context_source_mode|context_source):\s*(.*)\z') { continue }
+        throw "Repository registry contains unsupported top-level syntax: $text"
+    }
+
+    if ($null -ne $currentRepository) {
+        if ([string]::IsNullOrWhiteSpace($currentRole)) { throw "Repository registry entry '$currentRepository' is missing required role." }
+        $repositories[$currentRepository] = [ordered]@{ role = $currentRole; path = $currentPath }
+    }
+    if ([string]::IsNullOrWhiteSpace($project)) { throw 'Repository registry is missing required project field.' }
+    if (-not $sawRepositories) { throw 'Repository registry is missing required repositories field.' }
+    return [pscustomobject]@{ project = $project; repositories = $repositories; path = 'repositories/repositories.yaml' }
+}
+
+function Get-MembershipInfo {
+    param([string]$ContextRoot, [object]$Config)
+    $registry = Get-RepositoryRegistry -ContextRoot $ContextRoot
+    $configuredProject = [string]$Config.project
+    $repoId = [string]$Config.repository
+    $projectMatches = $configuredProject -ceq [string]$registry.project
+    $entry = if ($projectMatches -and $registry.repositories.Contains($repoId)) { $registry.repositories[$repoId] } else { $null }
+    $registered = $null -ne $entry
+    $issue = if (-not $projectMatches) {
+        "Member project '$configuredProject' does not match central context project '$($registry.project)'."
+    } elseif (-not $registered) {
+        "Repository '$repoId' is not registered in $($registry.path)."
+    } else { $null }
+    return [pscustomobject]@{
+        registered = $registered
+        projectMatches = $projectMatches
+        centralProject = [string]$registry.project
+        role = $(if ($null -ne $entry) { [string]$entry.role } else { $null })
+        path = $(if ($null -ne $entry) { $entry.path } else { $null })
+        registryPath = [string]$registry.path
+        issue = $issue
+    }
+}
+
+function Assert-RegisteredMember {
+    param([string]$ContextRoot, [object]$Config)
+    $membership = Get-MembershipInfo -ContextRoot $ContextRoot -Config $Config
+    if (-not $membership.projectMatches -or -not $membership.registered) { throw [string]$membership.issue }
+    return $membership
+}
+
+function Get-ContextRemoteRepositoryName {
+    param([string]$Remote)
+    $value = $Remote.TrimEnd([char[]]@([char]92,[char]47))
+    if ([string]::IsNullOrWhiteSpace($value)) { return $null }
+    $name = ($value -split '[/\\]')[-1]
+    if ($name.EndsWith('.git')) { return $name.Substring(0, $name.Length - 4) }
+    return $name
+}
+
+function Resolve-RegisteredLocalPath {
+    param([string]$MemberRoot, [string]$ContextRoot, [object]$Entry, [string]$Repository)
+    $configuredPath = if ($null -ne $Entry.path) { [string]$Entry.path } else { $null }
+    if (-not [string]::IsNullOrWhiteSpace($configuredPath)) {
+        if ([System.IO.Path]::IsPathRooted($configuredPath)) { return [System.IO.Path]::GetFullPath($configuredPath) }
+        $fromContext = [System.IO.Path]::GetFullPath((Join-Path $ContextRoot $configuredPath))
+        if (Test-Path -LiteralPath $fromContext) { return $fromContext }
+        $leaf = Split-Path -Leaf $configuredPath
+        if (-not [string]::IsNullOrWhiteSpace($leaf)) {
+            return [System.IO.Path]::GetFullPath((Join-Path (Split-Path -Parent $MemberRoot) $leaf))
+        }
+    }
+    return [System.IO.Path]::GetFullPath((Join-Path (Split-Path -Parent $MemberRoot) $Repository))
+}
+
+function Get-MembershipAudit {
+    param([string]$MemberRoot, [string]$ContextRoot, [object]$Config)
+    $registry = Get-RepositoryRegistry -ContextRoot $ContextRoot
+    if ([string]$Config.project -cne [string]$registry.project) {
+        throw "Member project '$($Config.project)' does not match central context project '$($registry.project)'."
+    }
+
+    $registeredResults = @()
+    foreach ($repoId in @($registry.repositories.Keys | Sort-Object)) {
+        $entry = $registry.repositories[$repoId]
+        $localPath = Resolve-RegisteredLocalPath -MemberRoot $MemberRoot -ContextRoot $ContextRoot -Entry $entry -Repository $repoId
+        $issues = @()
+        $status = 'ok'
+        if (-not (Test-Path -LiteralPath $localPath)) {
+            $status = 'missing-local-path'; $issues += 'Registered repository local path is missing.'
+        } elseif (-not (Test-Path -LiteralPath (Join-Path $localPath '.git'))) {
+            $status = 'not-git-repository'; $issues += 'Registered local path is not a Git repository/worktree.'
+        } else {
+            $memberConfigPath = Join-Path $localPath '.ai/context/config.json'
+            if (-not (Test-Path -LiteralPath $memberConfigPath -PathType Leaf)) {
+                $status = 'missing-context-config'; $issues += 'Registered repository is missing .ai/context/config.json.'
+            } else {
+                try { $memberConfig = Get-Content -LiteralPath $memberConfigPath -Raw | ConvertFrom-Json } catch {
+                    $status = 'invalid-context-config'; $issues += 'Member context config is invalid JSON.'; $memberConfig = $null
+                }
+                if ($null -ne $memberConfig) {
+                    if ([string]$memberConfig.project -cne [string]$registry.project) { $issues += 'Member context project does not match central project.' }
+                    if ([string]$memberConfig.repository -cne [string]$repoId) { $issues += 'Member context repository id does not match registry id.' }
+                    if ($issues.Count -gt 0) { $status = 'mismatched-context-config' }
+                }
+            }
+        }
+        $registeredResults += [pscustomobject]@{
+            repository = $repoId; role = [string]$entry.role; configuredPath = $entry.path
+            localPath = $localPath; status = $status; issues = @($issues)
+        }
+    }
+
+    $registeredNames = @{}
+    foreach ($name in $registry.repositories.Keys) { $registeredNames[[string]$name] = $true }
+    $contextRepoName = Get-ContextRemoteRepositoryName -Remote ([string]$Config.context.remote)
+    $workspaceRoot = [System.IO.Path]::GetFullPath((Split-Path -Parent $MemberRoot))
+    $candidates = @()
+    foreach ($candidate in @(Get-ChildItem -LiteralPath $workspaceRoot -Directory -Force | Sort-Object Name)) {
+        if ($registeredNames.ContainsKey($candidate.Name) -or $candidate.Name -eq $contextRepoName) { continue }
+        if (-not (Test-Path -LiteralPath (Join-Path $candidate.FullName '.git'))) { continue }
+        $looksManaged = (Test-Path -LiteralPath (Join-Path $candidate.FullName 'AI_CONTEXT.md') -PathType Leaf) -or (Test-Path -LiteralPath (Join-Path $candidate.FullName '.ai/context')) -or $candidate.Name.StartsWith(([string]$registry.project + '-'))
+        if (-not $looksManaged) { continue }
+        $candidates += [pscustomobject]@{ repository = $candidate.Name; localPath = $candidate.FullName; reason = 'Sibling Git repository resembles a project member but is not registered.' }
+    }
+
+    $healthy = @($registeredResults | Where-Object { $_.status -eq 'ok' }).Count
+    return [pscustomobject]@{
+        schemaVersion = 1; project = [string]$registry.project; registryPath = [string]$registry.path
+        workspaceRoot = $workspaceRoot; registered = @($registeredResults); unregisteredCandidates = @($candidates)
+        summary = [pscustomobject]@{ registered = $registeredResults.Count; healthy = $healthy; issues = $registeredResults.Count - $healthy; candidates = $candidates.Count }
+    }
+}
+
 function Read-OptionalText {
     param([string]$Path)
     if (Test-Path -LiteralPath $Path -PathType Leaf) {
@@ -170,11 +373,13 @@ function Write-RuntimeBundle {
         [string]$MemberRoot,
         [string]$ContextRoot,
         [object]$Config,
-        [string]$ContextFreshness
+        [string]$ContextFreshness,
+        [object]$Membership = $null
     )
 
     $memberState = Get-GitState -Root $MemberRoot
     $contextState = Get-GitState -Root $ContextRoot
+    if ($null -eq $Membership) { $Membership = Get-MembershipInfo -ContextRoot $ContextRoot -Config $Config }
     $bridgeDir = Join-Path $MemberRoot '.ai-bridge'
     New-Item -ItemType Directory -Path $bridgeDir -Force | Out-Null
 
@@ -201,6 +406,7 @@ function Write-RuntimeBundle {
             dirty = $contextState.dirty
             freshness = $ContextFreshness
         }
+        membership = $Membership
     }
 
     $repoId = [string]$Config.repository
@@ -227,6 +433,8 @@ function Write-RuntimeBundle {
     $sections.Add("Repository dirty: $($runtime.member.dirty)")
     $sections.Add("Context HEAD: $($runtime.context.head)")
     $sections.Add("Context freshness: $ContextFreshness")
+    $sections.Add("Member registered: $($Membership.registered)")
+    $sections.Add("Member role: $(if ($null -ne $Membership.role) { [string]$Membership.role } else { 'none' })")
     $sections.Add('')
     $sections.Add('> This bundle is generated runtime evidence. Canonical implementation sources still outrank AI context.')
 
@@ -438,6 +646,34 @@ function Get-SafeSlug {
     return $slug
 }
 
+function Test-GitAncestor {
+    param([string]$ContextRoot, [string]$Ancestor, [string]$Descendant)
+    $result = Invoke-Git -WorkingDirectory $ContextRoot -Arguments @('merge-base', '--is-ancestor', $Ancestor, $Descendant) -AllowFailure
+    return $result.ExitCode -eq 0
+}
+
+function Sync-CheckpointPush {
+    param([string]$ContextRoot, [string]$ExpectedBranch, [string]$Remote)
+    $push = Invoke-GitNetwork -WorkingDirectory $ContextRoot -Arguments @('push', 'origin', "HEAD:$ExpectedBranch") -Remote $Remote -AllowFailure
+    if ($push.ExitCode -eq 0) { return }
+
+    Invoke-GitNetwork -WorkingDirectory $ContextRoot -Arguments @('fetch', 'origin', $ExpectedBranch) -Remote $Remote | Out-Null
+    $remoteRef = "origin/$ExpectedBranch"
+    $remoteIsAncestor = Test-GitAncestor -ContextRoot $ContextRoot -Ancestor $remoteRef -Descendant 'HEAD'
+    $localIsAncestor = Test-GitAncestor -ContextRoot $ContextRoot -Ancestor 'HEAD' -Descendant $remoteRef
+
+    if ($remoteIsAncestor -and -not $localIsAncestor) {
+        $retry = Invoke-GitNetwork -WorkingDirectory $ContextRoot -Arguments @('push', 'origin', "HEAD:$ExpectedBranch") -Remote $Remote -AllowFailure
+        if ($retry.ExitCode -ne 0) { throw 'Context push remained unconfirmed even though remote history is an ancestor of the local checkpoint.' }
+        return
+    }
+    if ($localIsAncestor) {
+        Invoke-Git -WorkingDirectory $ContextRoot -Arguments @('merge', '--ff-only', $remoteRef) | Out-Null
+        return
+    }
+    throw 'Context push was rejected because local and remote context histories diverged. Automatic merge, rebase, reset, and force-push are forbidden; both histories were preserved.'
+}
+
 $configFullPath = [System.IO.Path]::GetFullPath($ConfigPath)
 $memberRootFullPath = [System.IO.Path]::GetFullPath($RepositoryRoot)
 if (-not (Test-Path -LiteralPath $configFullPath -PathType Leaf)) {
@@ -471,14 +707,23 @@ $freshness = if ($contextState.dirty) {
     'CURRENT_OR_FETCHED'
 }
 
+if ($Action -eq 'audit') {
+    $audit = Get-MembershipAudit -MemberRoot $memberRootFullPath -ContextRoot $contextRoot -Config $config
+    $audit | ConvertTo-Json -Depth 10
+    exit 0
+}
+
 if ($Action -eq 'status') {
-    $runtime = Write-RuntimeBundle -MemberRoot $memberRootFullPath -ContextRoot $contextRoot -Config $config -ContextFreshness $freshness
-    $runtime | ConvertTo-Json -Depth 8
+    $membership = Get-MembershipInfo -ContextRoot $contextRoot -Config $config
+    $runtime = Write-RuntimeBundle -MemberRoot $memberRootFullPath -ContextRoot $contextRoot -Config $config -ContextFreshness $freshness -Membership $membership
+    $runtime | ConvertTo-Json -Depth 10
+    if (-not $membership.projectMatches -or -not $membership.registered) { exit 12 }
     exit 0
 }
 
 if ($Action -eq 'start') {
-    $runtime = Write-RuntimeBundle -MemberRoot $memberRootFullPath -ContextRoot $contextRoot -Config $config -ContextFreshness $freshness
+    $membership = Assert-RegisteredMember -ContextRoot $contextRoot -Config $config
+    $runtime = Write-RuntimeBundle -MemberRoot $memberRootFullPath -ContextRoot $contextRoot -Config $config -ContextFreshness $freshness -Membership $membership
     Write-Output "AI context ready: $($runtime.repository) @ $($runtime.context.head) [$freshness]"
     exit 0
 }
@@ -487,6 +732,7 @@ if ($Action -eq 'checkpoint') {
     if ($contextState.dirty) {
         throw 'Automated checkpoint refused because the central context cache has pre-existing uncommitted changes.'
     }
+    Assert-RegisteredMember -ContextRoot $contextRoot -Config $config | Out-Null
     $checkpointFreshness = if ($Offline) { 'OFFLINE_IMPORTED_CONTEXT' } else { 'CURRENT_OR_FETCHED' }
 
     $checkpointPath = Join-Path $memberRootFullPath '.ai-bridge/context-checkpoint.json'
@@ -639,16 +885,7 @@ if ($Action -eq 'checkpoint') {
     Invoke-Git -WorkingDirectory $contextRoot -Arguments (@('commit', '-m', $message, '--') + $pathsToCommit) | Out-Null
 
     if (-not $Offline -and [bool]$config.behavior.pushContext) {
-        $push = Invoke-GitNetwork -WorkingDirectory $contextRoot -Arguments @('push', 'origin', "HEAD:$expectedBranch") -Remote $contextRemote -AllowFailure
-        if ($push.ExitCode -ne 0) {
-            Invoke-GitNetwork -WorkingDirectory $contextRoot -Arguments @('fetch', 'origin', $expectedBranch) -Remote $contextRemote | Out-Null
-            $rebase = Invoke-Git -WorkingDirectory $contextRoot -Arguments @('rebase', "origin/$expectedBranch") -AllowFailure
-            if ($rebase.ExitCode -ne 0) {
-                Invoke-Git -WorkingDirectory $contextRoot -Arguments @('rebase', '--abort') -AllowFailure | Out-Null
-                throw 'Context push was rejected and automatic rebase could not be completed safely.'
-            }
-            Invoke-GitNetwork -WorkingDirectory $contextRoot -Arguments @('push', 'origin', "HEAD:$expectedBranch") -Remote $contextRemote | Out-Null
-        }
+        Sync-CheckpointPush -ContextRoot $contextRoot -ExpectedBranch $expectedBranch -Remote $contextRemote
     }
 
     Remove-Item -LiteralPath $checkpointPath -Force

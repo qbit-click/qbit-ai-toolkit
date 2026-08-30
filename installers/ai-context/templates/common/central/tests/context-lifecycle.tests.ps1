@@ -74,7 +74,7 @@ function New-TestEnvironment {
         'state/next-action.md' = "# Next`nContinue.`n"
         'state/open-questions.md' = "# Open Questions`nNone.`n"
         'state/pending-decisions.md' = "# Pending Decisions`nNone.`n"
-        'repositories/repositories.yaml' = "project: test-project`n"
+        'repositories/repositories.yaml' = "project: test-project`nrepositories:`n  test-member:`n    path: ../member-clone`n    role: implementation-owner`n"
     }
     foreach ($entry in $requiredFiles.GetEnumerator()) {
         $target = Join-Path $contextSeed $entry.Key
@@ -812,6 +812,87 @@ $tests += @{ Name = 'offline reconnect rejects divergent local and remote writer
         Assert-True -Condition ((Invoke-Git -Root $consumer.Cache -Arguments @('rev-parse','HEAD')) -eq $localHead) -Message 'Reconnect conflict must preserve local context HEAD.'
         Assert-True -Condition ((& git --git-dir $env.ContextBare rev-parse refs/heads/main).Trim() -eq $remoteHead) -Message 'Reconnect conflict must preserve remote context HEAD.'
         Assert-True -Condition (Test-Path -LiteralPath (Join-Path $consumerRoot '.ai-bridge/context-offline.json')) -Message 'Reconnect conflict must preserve offline marker for explicit reconciliation.'
+    } finally { Remove-Item -LiteralPath $env.Base -Recurse -Force -ErrorAction SilentlyContinue }
+} }
+
+$tests += @{ Name = 'unregistered member start status and checkpoint fail closed'; Run = {
+    $env = New-TestEnvironment -Name 'unregistered-member'
+    try {
+        Set-Content -LiteralPath (Join-Path $env.ContextSeed 'repositories/repositories.yaml') -Value "project: test-project`nrepositories: {}`n" -Encoding UTF8
+        Invoke-Git -Root $env.ContextSeed -Arguments @('add', 'repositories/repositories.yaml') | Out-Null
+        Invoke-Git -Root $env.ContextSeed -Arguments @('commit', '-m', 'remove member registration') | Out-Null
+        Invoke-Git -Root $env.ContextSeed -Arguments @('push', 'origin', 'main') | Out-Null
+
+        $start = Invoke-LauncherAllowFailure -Env $env -Action 'start'
+        Assert-True -Condition ($start.ExitCode -ne 0) -Message 'Unregistered member start must fail.'
+        Assert-True -Condition ($start.Output -like '*not registered*') -Message 'Unregistered start error must be actionable.'
+        Assert-True -Condition (-not (Test-Path -LiteralPath (Join-Path $env.MemberClone '.ai-bridge/context-runtime.json'))) -Message 'Failed start must not report usable runtime context.'
+
+        $status = Invoke-LauncherAllowFailure -Env $env -Action 'status'
+        Assert-True -Condition ($status.ExitCode -ne 0) -Message 'Unregistered member status must be unhealthy.'
+        Assert-True -Condition ($status.Output -like '*"registered":  false*' -or $status.Output -like '*"registered": false*') -Message 'Status must expose unregistered membership.'
+
+        Write-ValidCheckpoint -Env $env
+        $checkpoint = Invoke-LauncherAllowFailure -Env $env -Action 'checkpoint'
+        Assert-True -Condition ($checkpoint.ExitCode -ne 0) -Message 'Unregistered checkpoint must fail.'
+        Assert-True -Condition (Test-Path -LiteralPath $env.Checkpoint) -Message 'Rejected checkpoint artifact must remain for recovery.'
+        Assert-True -Condition (-not (Test-Path -LiteralPath (Join-Path $env.Cache 'state/repositories/test-member.md'))) -Message 'Rejected unregistered checkpoint must not write durable repository state.'
+    } finally { Remove-Item -LiteralPath $env.Base -Recurse -Force -ErrorAction SilentlyContinue }
+} }
+
+$tests += @{ Name = 'membership audit reports candidates without mutation'; Run = {
+    $env = New-TestEnvironment -Name 'membership-audit'
+    try {
+        $candidate = Join-Path $env.Base 'test-project-docs'
+        & git init --initial-branch=main $candidate | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw 'Unable to initialize audit candidate.' }
+        Initialize-GitIdentity -Root $candidate
+        Set-Content -LiteralPath (Join-Path $candidate 'AI_CONTEXT.md') -Value '# Candidate' -Encoding UTF8
+        Invoke-Git -Root $candidate -Arguments @('add', 'AI_CONTEXT.md') | Out-Null
+        Invoke-Git -Root $candidate -Arguments @('commit', '-m', 'candidate') | Out-Null
+        $before = (& git --git-dir $env.ContextBare rev-parse refs/heads/main).Trim()
+        $audit = Invoke-LauncherAllowFailure -Env $env -Action 'audit'
+        $after = (& git --git-dir $env.ContextBare rev-parse refs/heads/main).Trim()
+        Assert-True -Condition ($audit.ExitCode -eq 0) -Message ("Membership audit must succeed read-only. Output: " + $audit.Output)
+        Assert-True -Condition ($audit.Output -like '*test-project-docs*') -Message 'Audit must report unregistered candidate.'
+        Assert-True -Condition ($before -eq $after) -Message 'Audit must not mutate central context history.'
+    } finally { Remove-Item -LiteralPath $env.Base -Recurse -Force -ErrorAction SilentlyContinue }
+} }
+
+$tests += @{ Name = 'online checkpoint divergence rejects without rebase'; Run = {
+    $env = New-TestEnvironment -Name 'online-divergence'
+    try {
+        Invoke-Launcher -Env $env -Action 'start'
+        Initialize-GitIdentity -Root $env.Cache
+        $remoteWriter = Join-Path $env.Base 'remote-writer-online'
+        & git clone --branch main --single-branch $env.ContextBare $remoteWriter | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw 'Unable to clone online remote writer.' }
+        Initialize-GitIdentity -Root $remoteWriter
+        $writerPath = $remoteWriter.Replace([char]92, [char]47)
+        $hook = Join-Path $env.Cache '.git/hooks/pre-push'
+        $hookText = @"
+#!/usr/bin/env bash
+rm -f -- "`$0"
+printf 'remote race\n' >'$writerPath/online-race-remote.md'
+git -C '$writerPath' add online-race-remote.md
+git -C '$writerPath' commit -m 'remote online race' >/dev/null
+git -C '$writerPath' push origin main >/dev/null
+"@
+        [System.IO.File]::WriteAllText($hook, $hookText, [System.Text.UTF8Encoding]::new($false))
+        & git -C $env.Cache update-index --refresh | Out-Null
+        if (Get-Command bash -ErrorAction SilentlyContinue) { & bash -lc "chmod +x '$($hook.Replace([char]92,[char]47))'" | Out-Null }
+        Write-ValidCheckpoint -Env $env
+        $result = Invoke-LauncherAllowFailure -Env $env -Action 'checkpoint'
+        Assert-True -Condition ($result.ExitCode -ne 0) -Message 'Concurrent divergent checkpoint must fail.'
+        Assert-True -Condition ($result.Output -like '*histories diverged*') -Message 'Divergence failure must be explicit.'
+        Assert-True -Condition (Test-Path -LiteralPath $env.Checkpoint) -Message 'Rejected checkpoint artifact must remain.'
+        $localHead = Invoke-Git -Root $env.Cache -Arguments @('rev-parse', 'HEAD')
+        $remoteHead = (& git --git-dir $env.ContextBare rev-parse refs/heads/main).Trim()
+        Assert-True -Condition ($localHead -ne $remoteHead) -Message 'Divergent histories must remain distinct.'
+        & git -C $env.Cache merge-base --is-ancestor $localHead $remoteHead 2>$null; $localAncestor = $LASTEXITCODE -eq 0
+        & git -C $env.Cache merge-base --is-ancestor $remoteHead $localHead 2>$null; $remoteAncestor = $LASTEXITCODE -eq 0
+        Assert-True -Condition (-not $localAncestor -and -not $remoteAncestor) -Message 'Both divergent histories must be preserved.'
+        Assert-True -Condition (-not (Test-Path -LiteralPath (Join-Path $env.Cache '.git/rebase-merge')) -and -not (Test-Path -LiteralPath (Join-Path $env.Cache '.git/rebase-apply'))) -Message 'No rebase state may be created.'
     } finally { Remove-Item -LiteralPath $env.Base -Recurse -Force -ErrorAction SilentlyContinue }
 } }
 

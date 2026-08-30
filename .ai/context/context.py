@@ -391,8 +391,8 @@ def refresh_online_cache(repo_root: Path, cache_path: Path, remote: str, branch:
 
 def main() -> int:
     action = sys.argv[1] if len(sys.argv) > 1 else "start"
-    if action not in {"start", "status", "checkpoint", "export", "import", "reconnect"}:
-        raise RuntimeError("Action must be start, status, checkpoint, export, import, or reconnect.")
+    if action not in {"start", "status", "checkpoint", "audit", "export", "import", "reconnect"}:
+        raise RuntimeError("Action must be start, status, checkpoint, audit, export, import, or reconnect.")
     if shutil.which("git") is None:
         raise RuntimeError("Git is required for AI context lifecycle.")
 

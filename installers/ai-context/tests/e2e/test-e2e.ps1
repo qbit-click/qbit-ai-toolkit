@@ -12,6 +12,7 @@ try{
   $Central=Join-Path $TempRoot 'central';InitRepo $Central;&git -C $Central remote add origin $Bare
   &powershell -NoProfile -ExecutionPolicy Bypass -File $Install -Operation install -Mode central -Target $Central -ProjectId demo -ProjectDisplayName Demo -RepositoryId demo-ai-context -ContextRemote $Bare -ContextBranch main|Out-Null
   Assert ($LASTEXITCODE -eq 0) 'central installer failed'
+  WriteUtf8 (Join-Path $Central 'repositories/repositories.yaml') "project: demo`nrepositories:`n  demo-api:`n    path: ../member`n    role: application-member`n"
   &git -C $Central add --all;&git -C $Central -c user.name=Test -c user.email=test@example.invalid commit -q -m 'install context';&git -C $Central push -q -u origin main
   Assert ($LASTEXITCODE -eq 0) 'central context push failed'
   $CentralTests=Join-Path $Central 'tests/context-lifecycle.tests.ps1'

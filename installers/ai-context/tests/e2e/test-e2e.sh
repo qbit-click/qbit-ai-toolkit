@@ -21,6 +21,13 @@ git -C "$central" remote add origin "$remote"
 
 bash "$install" --operation install --mode central --target "$central" --project-id demo --project-display-name Demo --repository-id demo-ai-context --context-remote "$remote" --context-branch main --format json >/dev/null
 bash "$verify" --target "$central" --format json >/dev/null
+cat >"$central/repositories/repositories.yaml" <<'EOF'
+project: demo
+repositories:
+  demo-member:
+    path: ../member
+    role: application-member
+EOF
 git -C "$central" add .
 git -C "$central" commit -m 'install central context' >/dev/null
 git -C "$central" push -u origin main >/dev/null

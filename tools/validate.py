@@ -185,7 +185,7 @@ def all_files() -> list[Path]:
             name
             for name in dirs
             if name not in excluded_dirs
-            and not (relative_dir == Path("website") and name == "build")
+            and not (relative_dir == Path("website") and name in {"build", ".cache-loader", ".bun-tmp", "playwright-report", "test-results", "coverage"})
             and not (relative_dir == Path(".ai/context") and name == "cache")
         ]
         for filename in filenames:
@@ -457,14 +457,14 @@ def validate_ai_context_continuity_v2() -> None:
         if token not in canonical_docs:
             error(f"Continuity v2 canonical docs contract missing: {token}")
 
-    for token in ("## Continuity v2", "schemaVersion: 2", "workstreams/archive/", "validation/repositories/", "## Offline portability"):
+    for token in ("## Continuity v2", "schemaVersion: 2", "workstreams/archive/", "validation/repositories/", "## Membership and reconciliation", "`audit`", "never auto-merges, rebases, resets, or force-pushes", "## Offline portability"):
         if token not in central_docs:
             error(f"Generated central Continuity v2 documentation missing: {token}")
 
-    ps_actions = "[ValidateSet('start', 'status', 'checkpoint', 'export', 'import', 'reconnect')]"
+    ps_actions = "[ValidateSet('start', 'status', 'checkpoint', 'audit', 'export', 'import', 'reconnect')]"
     if ps_actions not in member_ps:
         error("PowerShell member launcher Continuity v2 action surface is incomplete")
-    py_actions = '{"start", "status", "checkpoint", "export", "import", "reconnect"}'
+    py_actions = '{"start", "status", "checkpoint", "audit", "export", "import", "reconnect"}'
     if py_actions not in member_py:
         error("Python/POSIX member launcher Continuity v2 action surface is incomplete")
 

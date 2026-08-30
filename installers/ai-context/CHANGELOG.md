@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.2.3
+
+- Enforce `repositories/repositories.yaml` as the explicit Continuity membership registry so unregistered members cannot silently start or checkpoint as healthy project members.
+- Add a read-only `audit` lifecycle action that reports missing/mismatched registered repositories and plausible unregistered sibling repositories without mutating project-owned registry state or Git history.
+- Replace online checkpoint auto-rebase fallback with ancestry-based fail-closed synchronization that preserves divergent histories and forbids automatic merge, rebase, reset, or force-push.
+- Add Windows/POSIX unit, integration, and real Git E2E coverage for membership enforcement, read-only fleet audit, and concurrent divergent checkpoint writers.
+- Keep toolkit root launchers, canonical Continuity documentation, generated central operations guidance, and repository validation contracts synchronized with the new lifecycle surface.
+
 ## 1.2.2
 
 - Align the toolkit's own agent/checkpoint policy and canonical documentation with Continuity v2 so new substantive checkpoints use schema v2 tracked continuity instead of the legacy schema v1 compatibility path.

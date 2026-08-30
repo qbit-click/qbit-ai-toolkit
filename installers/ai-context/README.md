@@ -1,6 +1,6 @@
 # AI Context Lifecycle installer
 
-`installer.ai-context` installs the zero-touch AI context lifecycle as a versioned toolkit asset. The current stable release is `1.2.2`; Continuity v2 is supported on Windows, Linux, and macOS in two modes:
+`installer.ai-context` installs the zero-touch AI context lifecycle as a versioned toolkit asset. The current stable release is `1.2.3`; Continuity v2 is supported on Windows, Linux, and macOS in two modes:
 
 - `member`: installs repository launchers/config plus managed lifecycle blocks in `AGENTS.md`, `AI_CONTEXT.md`, `.gitignore`, and `.ai-bridge/.gitignore`.
 - `central`: installs the canonical lifecycle engines, member launcher templates, checkpoint schema, regression suites, and automation documentation. It seeds project continuity files only when absent; seeded continuity becomes project-owned immediately and is never overwritten or removed by installer update/uninstall.
@@ -97,11 +97,15 @@ State is written last to `.qbit/toolkit/installed/ai-context.json`. Mutations sn
 Member agents select the launcher for the active host:
 
 ```text
-Windows      .ai/context/context.ps1 start|status|checkpoint|export|import|reconnect
-Linux/macOS  bash .ai/context/context.sh start|status|checkpoint|export|import|reconnect
+Windows      .ai/context/context.ps1 start|status|checkpoint|audit|export|import|reconnect
+Linux/macOS  bash .ai/context/context.sh start|status|checkpoint|audit|export|import|reconnect
 ```
 
 The POSIX launcher uses only Python's standard library plus Git. Cache refresh is non-destructive: dirty context caches are never overwritten, diverged caches are not reset, and dirty caches refuse automatic origin migration/checkpointing. New substantive checkpoints use schema v2 tracked continuity with stable work-item IDs, execution cursor, dependencies, acceptance criteria, and structured validation ledger entries. The lifecycle rejects silent work-item loss, invalid status transitions, dependency cycles, duplicate validation IDs, and snapshot/downgrade attempts that would erase unresolved work. Validation evidence is bound to a deterministic member worktree fingerprint and is reported stale after relevant source changes. Secret-like material is rejected before central continuity files are written.
+
+`repositories/repositories.yaml` is the explicit central membership registry. A member's configured `project` must match the central registry project and its `repository` ID must exist in that registry with a non-empty `role`. `start` and `checkpoint` fail closed for unregistered members; `status` still emits runtime evidence but returns an unhealthy exit status and includes membership diagnostics. The read-only `audit` action reconciles registry entries with nearby Git worktrees, reporting missing/mismatched registered repositories and plausible unregistered sibling repositories without modifying the registry, member repositories, or central history.
+
+Online checkpoint publication uses ancestry checks rather than automatic history rewriting. A normal push is attempted first; after a rejection the lifecycle fetches the configured branch and only retries/fast-forwards when one side is already an ancestor of the other. Independent local and remote advances fail closed with both histories preserved. The checkpoint path never auto-merges, rebases, resets, or force-pushes divergent context history.
 
 `export` creates an ignored `.ai-bridge/context-transfer/` package containing a verified Git bundle plus a manifest with project/repository identity, source provenance, continuity summary, byte length, and SHA-256. Export requires a clean context cache and scans all tracked context files for unsupported file types, symlink/reparse escapes, non-UTF-8 content, and secret-like material. `import` verifies the manifest, bundle size/hash, Git bundle integrity, configured repository/branch identity, and exact source HEAD before creating or accepting a local context cache. An imported cache runs `start` and `checkpoint` without network access and reports freshness as `OFFLINE_IMPORTED_CONTEXT`; offline checkpoints commit locally and never attempt a push.
 

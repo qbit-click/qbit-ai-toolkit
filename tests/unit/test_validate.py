@@ -224,6 +224,17 @@ class ValidateUnitTests(unittest.TestCase):
         self.assertIn(".ai-bridge/README.md", names)
         self.assertIn("source.txt", names)
 
+    def test_all_files_excludes_generated_website_test_artifacts(self) -> None:
+        write_text(self.root / "website" / "test-results" / ".last-run.json", "{}")
+        write_text(self.root / "website" / "playwright-report" / "index.html", "generated")
+        write_text(self.root / "website" / "coverage" / "coverage.json", "{}")
+        write_text(self.root / "website" / "docs" / "source.md", "source\n")
+        names = {path.relative_to(self.root).as_posix() for path in validate.all_files()}
+        self.assertNotIn("website/test-results/.last-run.json", names)
+        self.assertNotIn("website/playwright-report/index.html", names)
+        self.assertNotIn("website/coverage/coverage.json", names)
+        self.assertIn("website/docs/source.md", names)
+
     def test_unresolved_placeholder_boundaries(self) -> None:
         write_text(self.root / "installers" / "codex-ai-tooling" / "templates" / "common" / "file.txt", "{{" + "PROJECT" + "}}\n")
         write_text(self.root / "website" / "i18n" / "fa" / "docusaurus-plugin-content-docs" / "current" / "asset-contract.md", "`{{" + "PROJECT" + "}}`\n")

@@ -87,6 +87,150 @@ def require_context_files(context_root: Path) -> None:
             raise RuntimeError(f"Central context is missing required file: {relative}")
 
 
+def parse_registry_scalar(raw: str, label: str) -> str:
+    value = raw.strip()
+    if " #" in value:
+        value = value.split(" #", 1)[0].rstrip()
+    if not value:
+        raise RuntimeError(f"Repository registry {label} must not be empty.")
+    if value.startswith('"'):
+        try:
+            decoded = json.loads(value)
+        except json.JSONDecodeError as exc:
+            raise RuntimeError(f"Repository registry {label} has invalid quoted YAML scalar syntax.") from exc
+        if not isinstance(decoded, str) or not decoded.strip():
+            raise RuntimeError(f"Repository registry {label} must be a non-empty string.")
+        return decoded
+    if value.startswith("'"):
+        if len(value) < 2 or not value.endswith("'"):
+            raise RuntimeError(f"Repository registry {label} has invalid quoted YAML scalar syntax.")
+        decoded = value[1:-1].replace("''", "'")
+        if not decoded.strip():
+            raise RuntimeError(f"Repository registry {label} must be a non-empty string.")
+        return decoded
+    return value
+
+
+def load_repository_registry(context_root: Path) -> dict[str, Any]:
+    registry_path = context_root / "repositories" / "repositories.yaml"
+    try:
+        lines = registry_path.read_text(encoding="utf-8-sig").splitlines()
+    except UnicodeDecodeError as exc:
+        raise RuntimeError("Repository registry must be UTF-8 text.") from exc
+
+    project: str | None = None
+    repositories: dict[str, dict[str, str | None]] = {}
+    saw_repositories = False
+    in_repositories = False
+    current_repository: str | None = None
+    current_fields: dict[str, str] = {}
+
+    def finish_repository() -> None:
+        nonlocal current_repository, current_fields
+        if current_repository is None:
+            return
+        role = current_fields.get("role")
+        if role is None or not role.strip():
+            raise RuntimeError(f"Repository registry entry '{current_repository}' is missing required role.")
+        repositories[current_repository] = {"role": role, "path": current_fields.get("path")}
+        current_repository = None
+        current_fields = {}
+
+    for line_number, original in enumerate(lines, start=1):
+        if "\t" in original:
+            raise RuntimeError(f"Repository registry uses unsupported tab indentation at line {line_number}.")
+        stripped = original.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+
+        if in_repositories and not original.startswith(" "):
+            finish_repository()
+            in_repositories = False
+
+        if in_repositories:
+            repo_match = re.fullmatch(r"  ([A-Za-z0-9][A-Za-z0-9._-]{0,127}):\s*", original)
+            if repo_match:
+                finish_repository()
+                repo_id = repo_match.group(1)
+                if repo_id in repositories:
+                    raise RuntimeError(f"Repository registry contains duplicate repository id '{repo_id}'.")
+                current_repository = repo_id
+                current_fields = {}
+                continue
+
+            field_match = re.fullmatch(r"    (path|role):\s*(.*)", original)
+            if field_match and current_repository is not None:
+                field, raw_value = field_match.groups()
+                if field in current_fields:
+                    raise RuntimeError(f"Repository registry entry '{current_repository}' contains duplicate field '{field}'.")
+                current_fields[field] = parse_registry_scalar(raw_value, f"{current_repository}.{field}")
+                continue
+
+            raise RuntimeError(f"Repository registry has unsupported structure at line {line_number}.")
+
+        top_match = re.fullmatch(r"([A-Za-z0-9_]+):\s*(.*)", original)
+        if not top_match:
+            raise RuntimeError(f"Repository registry has unsupported top-level syntax at line {line_number}.")
+        key, raw_value = top_match.groups()
+        if key == "project":
+            if project is not None:
+                raise RuntimeError("Repository registry contains duplicate project field.")
+            project = parse_registry_scalar(raw_value, "project")
+        elif key == "repositories":
+            if saw_repositories:
+                raise RuntimeError("Repository registry contains duplicate repositories field.")
+            saw_repositories = True
+            compact = raw_value.strip()
+            if compact in {"[]", "{}"}:
+                in_repositories = False
+            elif compact == "":
+                in_repositories = True
+            else:
+                raise RuntimeError("Repository registry repositories field must be an indented mapping, [] or {}.")
+        elif key in {"schema_version", "workspace_root", "context_source_mode", "context_source"}:
+            if raw_value.strip():
+                parse_registry_scalar(raw_value, key)
+        else:
+            raise RuntimeError(f"Repository registry contains unsupported top-level field '{key}'.")
+
+    finish_repository()
+    if project is None:
+        raise RuntimeError("Repository registry is missing required project field.")
+    if not saw_repositories:
+        raise RuntimeError("Repository registry is missing required repositories field.")
+    return {"project": project, "repositories": repositories, "path": "repositories/repositories.yaml"}
+
+
+def membership_info(context_root: Path, config: dict[str, Any]) -> dict[str, Any]:
+    registry = load_repository_registry(context_root)
+    configured_project = str(config.get("project") or "")
+    repo_id = str(config.get("repository") or "")
+    project_matches = configured_project == registry["project"]
+    entry = registry["repositories"].get(repo_id) if project_matches else None
+    registered = entry is not None
+    issue = None
+    if not project_matches:
+        issue = f"Member project '{configured_project}' does not match central context project '{registry['project']}'."
+    elif not registered:
+        issue = f"Repository '{repo_id}' is not registered in {registry['path']}."
+    return {
+        "registered": registered,
+        "projectMatches": project_matches,
+        "centralProject": registry["project"],
+        "role": entry.get("role") if entry else None,
+        "path": entry.get("path") if entry else None,
+        "registryPath": registry["path"],
+        "issue": issue,
+    }
+
+
+def require_registered_member(context_root: Path, config: dict[str, Any]) -> dict[str, Any]:
+    membership = membership_info(context_root, config)
+    if not membership["projectMatches"] or not membership["registered"]:
+        raise RuntimeError(str(membership["issue"]))
+    return membership
+
+
 def read_optional(path: Path) -> str | None:
     return path.read_text(encoding="utf-8-sig") if path.is_file() else None
 
@@ -101,9 +245,16 @@ def write_text(path: Path, text: str) -> None:
     path.write_bytes(text.replace("\r\n", "\n").replace("\r", "\n").encode("utf-8"))
 
 
-def runtime_bundle(member_root: Path, context_root: Path, config: dict[str, Any], freshness: str) -> dict[str, Any]:
+def runtime_bundle(
+    member_root: Path,
+    context_root: Path,
+    config: dict[str, Any],
+    freshness: str,
+    membership: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     member_state = git_state(member_root)
     context_state = git_state(context_root)
+    membership = membership or membership_info(context_root, config)
     generated = dt.datetime.now().astimezone().isoformat()
     runtime = {
         "schemaVersion": 1,
@@ -128,6 +279,7 @@ def runtime_bundle(member_root: Path, context_root: Path, config: dict[str, Any]
             "dirty": context_state["dirty"],
             "freshness": freshness,
         },
+        "membership": membership,
     }
     repo_id = str(config["repository"])
     repository_manifest = read_json_optional(context_root / f"manifests/repositories/{repo_id}.json")
@@ -151,7 +303,9 @@ def runtime_bundle(member_root: Path, context_root: Path, config: dict[str, Any]
         "# Runtime AI Context", "", f"Generated: {generated}", f"Repository: {runtime['repository']}",
         f"Repository HEAD: {member_state['head']}", f"Repository branch: {member_state['branch']}",
         f"Repository dirty: {member_state['dirty']}", f"Context HEAD: {context_state['head']}",
-        f"Context freshness: {freshness}", "",
+        f"Context freshness: {freshness}",
+        f"Member registered: {membership['registered']}",
+        f"Member role: {membership['role'] or 'none'}", "",
         "> This bundle is generated runtime evidence. Canonical implementation sources still outrank AI context.",
     ]
     inputs = [
@@ -188,6 +342,108 @@ def runtime_bundle(member_root: Path, context_root: Path, config: dict[str, Any]
         ])
     write_text(bridge / "context-runtime.md", "\n".join(lines) + "\n")
     return runtime
+
+
+def remote_repository_name(remote: str) -> str | None:
+    value = remote.rstrip("/\\")
+    if not value:
+        return None
+    name = re.split(r"[/\\]", value)[-1]
+    return name[:-4] if name.endswith(".git") else name
+
+
+def resolve_registered_local_path(member_root: Path, context_root: Path, configured_path: str | None, repo_id: str) -> Path:
+    if configured_path:
+        candidate = Path(configured_path)
+        if candidate.is_absolute():
+            return candidate.resolve()
+        from_context = (context_root / candidate).resolve()
+        if from_context.exists():
+            return from_context
+        if candidate.name:
+            return (member_root.parent / candidate.name).resolve()
+    return (member_root.parent / repo_id).resolve()
+
+
+def audit_membership(member_root: Path, context_root: Path, config: dict[str, Any]) -> dict[str, Any]:
+    registry = load_repository_registry(context_root)
+    configured_project = str(config.get("project") or "")
+    if configured_project != registry["project"]:
+        raise RuntimeError(f"Member project '{configured_project}' does not match central context project '{registry['project']}'.")
+
+    registered_results: list[dict[str, Any]] = []
+    registered_names = set(registry["repositories"])
+    for repo_id, entry in sorted(registry["repositories"].items()):
+        local_path = resolve_registered_local_path(member_root, context_root, entry.get("path"), repo_id)
+        result: dict[str, Any] = {
+            "repository": repo_id,
+            "role": entry.get("role"),
+            "configuredPath": entry.get("path"),
+            "localPath": str(local_path),
+            "status": "ok",
+            "issues": [],
+        }
+        if not local_path.exists():
+            result["status"] = "missing-local-path"
+            result["issues"].append("Registered repository local path is missing.")
+        elif not (local_path / ".git").exists():
+            result["status"] = "not-git-repository"
+            result["issues"].append("Registered local path is not a Git repository/worktree.")
+        else:
+            member_config_path = local_path / ".ai" / "context" / "config.json"
+            if not member_config_path.is_file():
+                result["status"] = "missing-context-config"
+                result["issues"].append("Registered repository is missing .ai/context/config.json.")
+            else:
+                try:
+                    member_config = json.loads(member_config_path.read_text(encoding="utf-8-sig"))
+                except Exception:
+                    result["status"] = "invalid-context-config"
+                    result["issues"].append("Member context config is invalid JSON.")
+                else:
+                    if str(member_config.get("project") or "") != registry["project"]:
+                        result["issues"].append("Member context project does not match central project.")
+                    if str(member_config.get("repository") or "") != repo_id:
+                        result["issues"].append("Member context repository id does not match registry id.")
+                    if result["issues"]:
+                        result["status"] = "mismatched-context-config"
+        registered_results.append(result)
+
+    context_repo_name = remote_repository_name(str((config.get("context") or {}).get("remote") or ""))
+    candidates: list[dict[str, Any]] = []
+    workspace_root = member_root.parent.resolve()
+    for candidate in sorted((path for path in workspace_root.iterdir() if path.is_dir()), key=lambda path: path.name.lower()):
+        if candidate.name in registered_names or candidate.name == context_repo_name:
+            continue
+        if not (candidate / ".git").exists():
+            continue
+        looks_managed = (
+            (candidate / "AI_CONTEXT.md").is_file()
+            or (candidate / ".ai" / "context").exists()
+            or candidate.name.startswith(f"{registry['project']}-")
+        )
+        if not looks_managed:
+            continue
+        candidates.append({
+            "repository": candidate.name,
+            "localPath": str(candidate.resolve()),
+            "reason": "Sibling Git repository resembles a project member but is not registered.",
+        })
+
+    return {
+        "schemaVersion": 1,
+        "project": registry["project"],
+        "registryPath": registry["path"],
+        "workspaceRoot": str(workspace_root),
+        "registered": registered_results,
+        "unregisteredCandidates": candidates,
+        "summary": {
+            "registered": len(registered_results),
+            "healthy": sum(1 for item in registered_results if item["status"] == "ok"),
+            "issues": sum(1 for item in registered_results if item["status"] != "ok"),
+            "candidates": len(candidates),
+        },
+    }
 
 
 def validate_context_id(value: Any, label: str) -> str:
@@ -654,11 +910,39 @@ def checkpoint_markdown(checkpoint: dict[str, Any], member_state: dict[str, Any]
     return "\n".join(lines)
 
 
+def git_is_ancestor(context_root: Path, ancestor: str, descendant: str) -> bool:
+    return run_git(context_root, ["merge-base", "--is-ancestor", ancestor, descendant], True).returncode == 0
+
+
+def synchronize_checkpoint_push(context_root: Path, expected_branch: str) -> None:
+    pushed = run_git(context_root, ["push", "origin", f"HEAD:{expected_branch}"], True)
+    if pushed.returncode == 0:
+        return
+
+    run_git(context_root, ["fetch", "origin", expected_branch])
+    remote_ref = f"origin/{expected_branch}"
+    remote_is_ancestor = git_is_ancestor(context_root, remote_ref, "HEAD")
+    local_is_ancestor = git_is_ancestor(context_root, "HEAD", remote_ref)
+
+    if remote_is_ancestor and not local_is_ancestor:
+        retried = run_git(context_root, ["push", "origin", f"HEAD:{expected_branch}"], True)
+        if retried.returncode != 0:
+            raise RuntimeError("Context push was rejected even though remote history is an ancestor of the local checkpoint; publication was not confirmed.")
+        return
+
+    if local_is_ancestor:
+        run_git(context_root, ["merge", "--ff-only", remote_ref])
+        return
+
+    raise RuntimeError("Context push was rejected because local and remote context histories diverged. Automatic merge, rebase, reset, and force-push are forbidden; both histories were preserved.")
+
+
 def do_checkpoint(member_root: Path, context_root: Path, config: dict[str, Any], expected_branch: str, offline: bool = False) -> None:
     context_state = git_state(context_root)
     checkpoint_freshness = "OFFLINE_IMPORTED_CONTEXT" if offline else "CURRENT_OR_FETCHED"
     if context_state["dirty"]:
         raise RuntimeError("Automated checkpoint refused because the central context cache has pre-existing uncommitted changes.")
+    require_registered_member(context_root, config)
     checkpoint_path = member_root / ".ai-bridge" / "context-checkpoint.json"
     if not checkpoint_path.is_file():
         raise RuntimeError("No context checkpoint file exists at .ai-bridge/context-checkpoint.json.")
@@ -735,15 +1019,7 @@ def do_checkpoint(member_root: Path, context_root: Path, config: dict[str, Any],
     message = f"chore(context): checkpoint {repo_id} {slug(str(checkpoint['scope']))}"
     run_git(context_root, ["commit", "-m", message, "--", *paths])
     if not offline and bool((config.get("behavior") or {}).get("pushContext")):
-        remote = str(config["context"]["remote"])
-        pushed = run_git(context_root, ["push", "origin", f"HEAD:{expected_branch}"], True)
-        if pushed.returncode:
-            run_git(context_root, ["fetch", "origin", expected_branch])
-            rebased = run_git(context_root, ["rebase", f"origin/{expected_branch}"], True)
-            if rebased.returncode:
-                run_git(context_root, ["rebase", "--abort"], True)
-                raise RuntimeError("Context push was rejected and automatic rebase could not be completed safely.")
-            run_git(context_root, ["push", "origin", f"HEAD:{expected_branch}"])
+        synchronize_checkpoint_push(context_root, expected_branch)
     checkpoint_path.unlink(missing_ok=True)
     runtime = runtime_bundle(member_root, context_root, config, checkpoint_freshness)
     print(f"AI context checkpoint committed: {runtime['context']['head']}")
@@ -751,7 +1027,7 @@ def do_checkpoint(member_root: Path, context_root: Path, config: dict[str, Any],
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--action", required=True, choices=("start", "status", "checkpoint"))
+    parser.add_argument("--action", required=True, choices=("start", "status", "checkpoint", "audit"))
     parser.add_argument("--repository-root", required=True)
     parser.add_argument("--offline", action="store_true")
     parser.add_argument("--config-path", required=True)
@@ -790,13 +1066,19 @@ def main() -> int:
         freshness = "STALE_LOCAL_CONTEXT"
     else:
         freshness = "CURRENT_OR_FETCHED"
+    if args.action == "audit":
+        print(json.dumps(audit_membership(member_root, context_root, config), ensure_ascii=False, indent=2))
+        return 0
     if args.action == "status":
-        print(json.dumps(runtime_bundle(member_root, context_root, config, freshness), ensure_ascii=False, indent=2))
-    elif args.action == "start":
-        runtime = runtime_bundle(member_root, context_root, config, freshness)
+        membership = membership_info(context_root, config)
+        print(json.dumps(runtime_bundle(member_root, context_root, config, freshness, membership), ensure_ascii=False, indent=2))
+        return 0 if membership["projectMatches"] and membership["registered"] else 12
+    if args.action == "start":
+        membership = require_registered_member(context_root, config)
+        runtime = runtime_bundle(member_root, context_root, config, freshness, membership)
         print(f"AI context ready: {runtime['repository']} @ {runtime['context']['head']} [{freshness}]")
-    else:
-        do_checkpoint(member_root, context_root, config, expected_branch, offline=args.offline)
+        return 0
+    do_checkpoint(member_root, context_root, config, expected_branch, offline=args.offline)
     return 0
 
 

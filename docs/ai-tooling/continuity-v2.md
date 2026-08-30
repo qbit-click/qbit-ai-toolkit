@@ -5,7 +5,7 @@ sidebar_label: Continuity v2
 
 # AI Context Continuity v2
 
-Continuity v2 is the durable project-context model shipped by `installer.ai-context`. The current stable release is `1.2.2`. It is designed for exact continuation of repository work across fresh ChatGPT/Codex sessions, accounts, machines, and temporary offline periods without treating chat history as the source of truth.
+Continuity v2 is the durable project-context model shipped by `installer.ai-context`. The current stable release is `1.2.3`. It is designed for exact continuation of repository work across fresh ChatGPT/Codex sessions, accounts, machines, and temporary offline periods without treating chat history as the source of truth.
 
 ## Scope and authority
 
@@ -92,6 +92,7 @@ Managed repositories expose the same lifecycle actions on Windows and POSIX host
 start
 status
 checkpoint
+audit
 export
 import
 reconnect
@@ -109,9 +110,11 @@ Linux/macOS:
 bash .ai/context/context.sh start
 ```
 
-Before substantive work, run `start` once and read `.ai-bridge/context-runtime.md`. Treat its active workstream, cursor, unresolved work items, and validation freshness as the resume contract.
+Before substantive work, run `start` once and read `.ai-bridge/context-runtime.md`. Treat its active workstream, cursor, unresolved work items, validation freshness, and membership diagnostics as the resume contract.
 
-After a substantive validated continuity milestone, write `.ai-bridge/context-checkpoint.json` and run `checkpoint`. Ordinary read-only questions and per-message activity do not require checkpoints.
+Central membership is explicit. `repositories/repositories.yaml` owns the list of managed repository IDs and their roles. A member config must use the same project ID and a repository ID present in that registry. Unregistered repositories are rejected by `start` and `checkpoint`; `status` still emits diagnostic runtime JSON but exits unhealthy. `audit` is read-only and compares the registry against nearby Git worktrees, reporting missing/mismatched registered repositories plus plausible unregistered siblings without auto-registering or mutating history.
+
+After a substantive validated continuity milestone, write `.ai-bridge/context-checkpoint.json` and run `checkpoint`. Ordinary read-only questions and per-message activity do not require checkpoints. Online checkpoint publication is ancestry-based: after a rejected push the lifecycle fetches the configured branch and only retries or fast-forwards when one side is already an ancestor of the other. Independent advances fail closed with both histories preserved; checkpoint publication never auto-merges, rebases, resets, or force-pushes divergent context history.
 
 ## Offline and cross-machine transfer
 

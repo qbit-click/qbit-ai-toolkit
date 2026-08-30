@@ -12,9 +12,17 @@ Validation evidence is stored in append-only repository ledgers under `validatio
 
 `schemaVersion: 1` checkpoints remain accepted only for backward compatibility when no unresolved v2 workstream would be lost. Agents should not create new substantive v1 checkpoints.
 
+## Membership and reconciliation
+
+`repositories/repositories.yaml` is the explicit project membership registry. Every managed member must use the same project ID as the central context and must have its repository ID registered with a non-empty role. `start` and `checkpoint` fail closed for unregistered members. `status` still emits diagnostic runtime evidence but returns an unhealthy exit status when membership is invalid.
+
+Use `audit` for read-only reconciliation. It compares registered entries with nearby Git worktrees and reports missing or mismatched registered repositories plus plausible unregistered sibling repositories. It never adds registry entries, rewrites member configuration, commits, or pushes.
+
 ## Checkpoint lifecycle
 
-After a substantive validated milestone, the agent writes `.ai-bridge/context-checkpoint.json` and runs the `checkpoint` action. The central lifecycle validates shape/status/continuity invariants, rejects secret-like material, derives Git provenance and the worktree fingerprint, writes repository-scoped state/handoff/session records, persists workstream and validation records, commits only the scoped context paths, and pushes when enabled.
+After a substantive validated milestone, the agent writes `.ai-bridge/context-checkpoint.json` and runs the `checkpoint` action. The central lifecycle validates membership, shape/status/continuity invariants, rejects secret-like material, derives Git provenance and the worktree fingerprint, writes repository-scoped state/handoff/session records, persists workstream and validation records, commits only the scoped context paths, and pushes when enabled.
+
+Online push synchronization is ancestry-based. After a rejected push the lifecycle fetches the configured branch. If the remote branch is already an ancestor of the local checkpoint it may retry the normal non-force push; if local history is an ancestor of the remote branch it only fast-forwards locally. If both sides advanced independently, checkpoint publication fails closed and preserves both histories. It never auto-merges, rebases, resets, or force-pushes divergent context history.
 
 ## Offline portability
 
