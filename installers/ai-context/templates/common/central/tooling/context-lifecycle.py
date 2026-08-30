@@ -124,6 +124,8 @@ def load_repository_registry(context_root: Path) -> dict[str, Any]:
     in_repositories = False
     current_repository: str | None = None
     current_fields: dict[str, str] = {}
+    ignored_top_level_block = False
+    ignored_repository_metadata = False
 
     def finish_repository() -> None:
         nonlocal current_repository, current_fields
@@ -142,6 +144,19 @@ def load_repository_registry(context_root: Path) -> dict[str, Any]:
         stripped = original.strip()
         if not stripped or stripped.startswith("#"):
             continue
+        indent = len(original) - len(original.lstrip(" "))
+        if indent % 2 != 0:
+            raise RuntimeError(f"Repository registry uses unsupported indentation at line {line_number}.")
+
+        if ignored_top_level_block:
+            if indent > 0:
+                continue
+            ignored_top_level_block = False
+
+        if in_repositories and ignored_repository_metadata:
+            if indent > 4:
+                continue
+            ignored_repository_metadata = False
 
         if in_repositories and not original.startswith(" "):
             finish_repository()
@@ -166,9 +181,18 @@ def load_repository_registry(context_root: Path) -> dict[str, Any]:
                 current_fields[field] = parse_registry_scalar(raw_value, f"{current_repository}.{field}")
                 continue
 
+            metadata_match = re.fullmatch(r"    ([A-Za-z0-9_][A-Za-z0-9_.-]*):\s*(.*)", original)
+            if metadata_match and current_repository is not None:
+                field, raw_value = metadata_match.groups()
+                if raw_value.strip():
+                    parse_registry_scalar(raw_value, f"{current_repository}.{field}")
+                else:
+                    ignored_repository_metadata = True
+                continue
+
             raise RuntimeError(f"Repository registry has unsupported structure at line {line_number}.")
 
-        top_match = re.fullmatch(r"([A-Za-z0-9_]+):\s*(.*)", original)
+        top_match = re.fullmatch(r"([A-Za-z0-9_][A-Za-z0-9_.-]*):\s*(.*)", original)
         if not top_match:
             raise RuntimeError(f"Repository registry has unsupported top-level syntax at line {line_number}.")
         key, raw_value = top_match.groups()
@@ -191,7 +215,10 @@ def load_repository_registry(context_root: Path) -> dict[str, Any]:
             if raw_value.strip():
                 parse_registry_scalar(raw_value, key)
         else:
-            raise RuntimeError(f"Repository registry contains unsupported top-level field '{key}'.")
+            if raw_value.strip():
+                parse_registry_scalar(raw_value, key)
+            else:
+                ignored_top_level_block = True
 
     finish_repository()
     if project is None:

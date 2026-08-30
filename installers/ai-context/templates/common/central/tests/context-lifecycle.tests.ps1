@@ -74,7 +74,7 @@ function New-TestEnvironment {
         'state/next-action.md' = "# Next`nContinue.`n"
         'state/open-questions.md' = "# Open Questions`nNone.`n"
         'state/pending-decisions.md' = "# Pending Decisions`nNone.`n"
-        'repositories/repositories.yaml' = "project: test-project`nrepositories:`n  test-member:`n    path: ../member-clone`n    role: implementation-owner`n"
+        'repositories/repositories.yaml' = "project: test-project`nexcluded_directories:`n  - Docs`n  - worktrees`nrepositories:`n  test-member:`n    path: ../member-clone`n    role: implementation-owner`n    authority:`n      - implementation`n      - tests`n    publish: true`n    notes: Project-owned metadata remains outside membership semantics.`n"
     }
     foreach ($entry in $requiredFiles.GetEnumerator()) {
         $target = Join-Path $contextSeed $entry.Key

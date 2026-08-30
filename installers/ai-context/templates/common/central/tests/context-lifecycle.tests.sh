@@ -41,10 +41,18 @@ Continue validated work.
 EOF
   cat >"$repo/repositories/repositories.yaml" <<'EOF'
 project: test-project
+excluded_directories:
+  - Docs
+  - worktrees
 repositories:
   test-member:
     path: ../member
     role: implementation-owner
+    authority:
+      - implementation
+      - tests
+    publish: true
+    notes: Project-owned metadata remains outside membership semantics.
 EOF
 }
 

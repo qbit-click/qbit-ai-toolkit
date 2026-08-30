@@ -179,11 +179,24 @@ function Get-RepositoryRegistry {
     $currentRepository = $null
     $currentRole = $null
     $currentPath = $null
+    $ignoredTopLevelBlock = $false
+    $ignoredRepositoryMetadata = $false
 
     foreach ($line in @(Get-Content -LiteralPath $path)) {
         $text = [string]$line
         if ($text.Contains("`t")) { throw 'Repository registry must not use tab indentation.' }
         if ([string]::IsNullOrWhiteSpace($text) -or $text.TrimStart().StartsWith('#')) { continue }
+        $indent = [regex]::Match($text, '^ *').Length
+        if (($indent % 2) -ne 0) { throw 'Repository registry must use two-space indentation.' }
+
+        if ($ignoredTopLevelBlock) {
+            if ($indent -gt 0) { continue }
+            $ignoredTopLevelBlock = $false
+        }
+        if ($inRepositories -and $ignoredRepositoryMetadata) {
+            if ($indent -gt 4) { continue }
+            $ignoredRepositoryMetadata = $false
+        }
 
         if ($inRepositories -and -not $text.StartsWith(' ')) {
             if ($null -ne $currentRepository) {
@@ -205,7 +218,7 @@ function Get-RepositoryRegistry {
                 $currentRepository = $repoId; $currentRole = $null; $currentPath = $null
                 continue
             }
-            if ($null -ne $currentRepository -and $text -match '^    (path|role):\s*(.+)\z') {
+            if ($null -ne $currentRepository -and $text -match '^    (path|role):\s*(.*)\z') {
                 $field = [string]$Matches[1]
                 $value = Normalize-RegistryValue -Raw ([string]$Matches[2]) -Label "$currentRepository.$field"
                 if ($field -eq 'role') {
@@ -214,6 +227,16 @@ function Get-RepositoryRegistry {
                 } else {
                     if ($null -ne $currentPath) { throw "Repository registry entry '$currentRepository' contains duplicate path." }
                     $currentPath = $value
+                }
+                continue
+            }
+            if ($null -ne $currentRepository -and $text -match '^    ([A-Za-z0-9_][A-Za-z0-9_.-]*):\s*(.*)\z') {
+                $metadataField = [string]$Matches[1]
+                $metadataValue = [string]$Matches[2]
+                if ([string]::IsNullOrWhiteSpace($metadataValue)) {
+                    $ignoredRepositoryMetadata = $true
+                } else {
+                    $null = Normalize-RegistryValue -Raw $metadataValue -Label "$currentRepository.$metadataField"
                 }
                 continue
             }
@@ -234,6 +257,16 @@ function Get-RepositoryRegistry {
             throw 'Repository registry repositories field must be an indented mapping, [] or {}.'
         }
         if ($text -match '^(schema_version|workspace_root|context_source_mode|context_source):\s*(.*)\z') { continue }
+        if ($text -match '^([A-Za-z0-9_][A-Za-z0-9_.-]*):\s*(.*)\z') {
+            $metadataField = [string]$Matches[1]
+            $metadataValue = [string]$Matches[2]
+            if ([string]::IsNullOrWhiteSpace($metadataValue)) {
+                $ignoredTopLevelBlock = $true
+            } else {
+                $null = Normalize-RegistryValue -Raw $metadataValue -Label $metadataField
+            }
+            continue
+        }
         throw "Repository registry contains unsupported top-level syntax: $text"
     }
 

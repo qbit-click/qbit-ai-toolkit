@@ -143,6 +143,32 @@ class AiContextPosixUnitTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "missing required role"):
                 lifecycle.load_repository_registry(root)
 
+    def test_repository_registry_preserves_membership_with_project_owned_metadata(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            registry = root / "repositories" / "repositories.yaml"
+            registry.parent.mkdir(parents=True)
+            registry.write_text(
+                "project: demo\n"
+                "workspace_root: D:/Projects/Demo\n"
+                "excluded_directories:\n"
+                "  - Docs\n"
+                "  - worktrees\n"
+                "repositories:\n"
+                "  demo-api:\n"
+                "    path: ../demo-api\n"
+                "    role: application-member\n"
+                "    authority:\n"
+                "      - implementation\n"
+                "      - tests\n"
+                "    publish: false\n"
+                "    notes: Project-owned metadata remains outside membership semantics.\n",
+                encoding="utf-8",
+            )
+            parsed = lifecycle.load_repository_registry(root)
+            self.assertEqual(parsed["project"], "demo")
+            self.assertEqual(parsed["repositories"], {"demo-api": {"role": "application-member", "path": "../demo-api"}})
+
     def test_rendered_lifecycle_exposes_audit_and_forbids_automatic_rebase(self) -> None:
         values = installer.values("demo", "Demo", "demo-ai-context", "demo-ai-context", "https://example.invalid/context.git", "main")
         central = installer.new_spec("central", values)

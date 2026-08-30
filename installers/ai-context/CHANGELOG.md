@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.4
+
+- Restore backward compatibility with project-owned repository registry metadata used by existing Continuity fleets, including top-level blocks such as `excluded_directories` and repository metadata such as `authority`, `publish`, and `notes`.
+- Keep membership semantics fail-closed for the canonical `project`, repository IDs, `path`, and required `role` fields while structurally validating and ignoring unrelated project-owned metadata.
+- Add rich-registry compatibility fixtures to Python unit and Windows/POSIX installed-layout lifecycle coverage so legacy fleet registry shapes remain supported.
+
 ## 1.2.3
 
 - Enforce `repositories/repositories.yaml` as the explicit Continuity membership registry so unregistered members cannot silently start or checkpoint as healthy project members.
