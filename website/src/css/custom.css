@@ -1,4 +1,4 @@
-@import '@fontsource-variable/vazirmatn';
+@import url('https://cdn.jsdelivr.net/npm/@fontsource-variable/vazirmatn@5.3.0/index.css');
 
 :root {
   --ifm-color-primary: #357da1;
@@ -18,7 +18,8 @@
   --ifm-navbar-height: 64px;
   --ifm-font-size-base: 16px;
   --ifm-line-height-base: 1.7;
-  --ifm-font-family-base: "Vazirmatn Variable", Inter, ui-sans-serif, system-ui, sans-serif;
+  --ifm-font-family-base: "Vazirmatn Variable", Inter, ui-sans-serif, system-ui, sans-serif !important;
+  --ifm-heading-font-family: "Vazirmatn Variable", Inter, ui-sans-serif, system-ui, sans-serif !important;
   --ifm-font-family-monospace: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   --ifm-code-font-size: 0.875em;
   --ifm-global-radius: 8px;
@@ -37,11 +38,17 @@
   --ifm-color-emphasis-700: #c0c0c5;
 }
 
-html[lang='fa-IR'] body,
-html[lang='fa-IR'] button,
-html[lang='fa-IR'] input,
-html[lang='fa-IR'] select,
-html[lang='fa-IR'] textarea {
+body,
+button,
+input,
+select,
+textarea,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
   font-family: "Vazirmatn Variable", Tahoma, "Segoe UI", Arial, sans-serif;
 }
 
@@ -90,6 +97,19 @@ html[dir='rtl'] table {
   min-width: 220px;
   height: 40px;
   background-color: var(--ifm-background-surface-color);
+  background-image: none !important;
+  padding-inline-start: 36px !important;
+  padding-inline-end: 80px !important;
+}
+
+.navbar__search > svg {
+  inset-inline-start: 12px !important;
+  inset-inline-end: auto !important;
+}
+
+.navbar__search > [class*='searchHintContainer'] {
+  inset-inline-start: auto !important;
+  inset-inline-end: 10px !important;
 }
 
 html[dir='rtl'] .navbar__search,
@@ -171,5 +191,10 @@ html[dir='rtl'] .navbar__search-input {
 
   .navbar__search-input {
     min-width: 0;
+    padding-inline-end: 8px !important;
+  }
+
+  .navbar__search > [class*='searchHintContainer'] {
+    display: none !important;
   }
 }

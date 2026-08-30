@@ -10,7 +10,7 @@ describe('documentation platform contract', () => {
   it('publishes the canonical Qbit documentation template manifest', () => {
     expect(template.schemaVersion).toBe(1);
     expect(template.template).toBe('qbit-documentation');
-    expect(template.templateVersion).toBe('1.0.0');
+    expect(template.templateVersion).toBe('1.0.1');
     expect(template.source).toEqual({
       repository: 'https://github.com/qbit-click/qbit-ai-toolkit.git',
       path: 'website',
@@ -29,7 +29,10 @@ describe('documentation platform contract', () => {
   it('uses the shared Qbit visual and RTL contract', () => {
     expect(css).toContain('--ifm-color-primary: #357da1');
     expect(css).toContain('--ifm-font-size-base: 16px');
-    expect(css).toContain('"Vazirmatn Variable"');
+    expect(css).toContain("@fontsource-variable/vazirmatn@5.3.0/index.css");
+    expect(css).toContain('--ifm-heading-font-family: "Vazirmatn Variable"');
+    expect(css).toContain('background-image: none !important');
+    expect(css).toContain("[class*='searchHintContainer']");
     expect(css).toContain('padding-inline');
     expect(css).toContain('margin-inline');
     expect(css).toContain('border-inline-end');
