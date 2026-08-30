@@ -850,11 +850,15 @@ $tests += @{ Name = 'membership audit reports candidates without mutation'; Run 
         Set-Content -LiteralPath (Join-Path $candidate 'AI_CONTEXT.md') -Value '# Candidate' -Encoding UTF8
         Invoke-Git -Root $candidate -Arguments @('add', 'AI_CONTEXT.md') | Out-Null
         Invoke-Git -Root $candidate -Arguments @('commit', '-m', 'candidate') | Out-Null
+        $contextAlias = Join-Path $env.Base 'local-context-alias'
+        & git clone --branch main --single-branch $env.ContextBare $contextAlias | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw 'Unable to clone context alias.' }
         $before = (& git --git-dir $env.ContextBare rev-parse refs/heads/main).Trim()
         $audit = Invoke-LauncherAllowFailure -Env $env -Action 'audit'
         $after = (& git --git-dir $env.ContextBare rev-parse refs/heads/main).Trim()
         Assert-True -Condition ($audit.ExitCode -eq 0) -Message ("Membership audit must succeed read-only. Output: " + $audit.Output)
         Assert-True -Condition ($audit.Output -like '*test-project-docs*') -Message 'Audit must report unregistered candidate.'
+        Assert-True -Condition ($audit.Output -notlike '*local-context-alias*') -Message 'Audit must exclude a sibling clone of the central context remote even when its folder name differs.'
         Assert-True -Condition ($before -eq $after) -Message 'Audit must not mutate central context history.'
     } finally { Remove-Item -LiteralPath $env.Base -Recurse -Force -ErrorAction SilentlyContinue }
 } }

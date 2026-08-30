@@ -319,6 +319,36 @@ function Get-ContextRemoteRepositoryName {
     return $name
 }
 
+function Get-NormalizedRemoteIdentity {
+    param([string]$Remote)
+    $value = ([string]$Remote).Trim().Replace([char]92, [char]47).TrimEnd([char]47)
+    if ([string]::IsNullOrWhiteSpace($value)) { return '' }
+    if ($value.EndsWith('.git')) { $value = $value.Substring(0, $value.Length - 4) }
+    if ($value -match '^[^@/\s]+@([^:]+):(.+)$') {
+        return ($Matches[1].ToLowerInvariant() + '/' + $Matches[2].TrimStart([char]47))
+    }
+    if ($value -match '^[A-Za-z][A-Za-z0-9+.-]*://(?:[^@/]+@)?([^/]+)/(.+)$') {
+        return ($Matches[1].ToLowerInvariant() + '/' + $Matches[2].TrimStart([char]47))
+    }
+    return $value
+}
+
+function Test-RepositoryRemoteMatch {
+    param([string]$RepositoryRoot, [string]$ExpectedRemote)
+    $expected = Get-NormalizedRemoteIdentity -Remote $ExpectedRemote
+    if ([string]::IsNullOrWhiteSpace($expected)) { return $false }
+    $remotes = Invoke-Git -WorkingDirectory $RepositoryRoot -Arguments @('remote') -AllowFailure
+    if ($remotes.ExitCode -ne 0) { return $false }
+    foreach ($remoteName in @($remotes.Output -split "`n" | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })) {
+        $urls = Invoke-Git -WorkingDirectory $RepositoryRoot -Arguments @('remote','get-url','--all',$remoteName.Trim()) -AllowFailure
+        if ($urls.ExitCode -ne 0) { continue }
+        foreach ($url in @($urls.Output -split "`n" | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })) {
+            if ((Get-NormalizedRemoteIdentity -Remote $url.Trim()) -ceq $expected) { return $true }
+        }
+    }
+    return $false
+}
+
 function Resolve-RegisteredLocalPath {
     param([string]$MemberRoot, [string]$ContextRoot, [object]$Entry, [string]$Repository)
     $configuredPath = if ($null -ne $Entry.path) { [string]$Entry.path } else { $null }
@@ -374,12 +404,14 @@ function Get-MembershipAudit {
 
     $registeredNames = @{}
     foreach ($name in $registry.repositories.Keys) { $registeredNames[[string]$name] = $true }
-    $contextRepoName = Get-ContextRemoteRepositoryName -Remote ([string]$Config.context.remote)
+    $contextRemote = [string]$Config.context.remote
+    $contextRepoName = Get-ContextRemoteRepositoryName -Remote $contextRemote
     $workspaceRoot = [System.IO.Path]::GetFullPath((Split-Path -Parent $MemberRoot))
     $candidates = @()
     foreach ($candidate in @(Get-ChildItem -LiteralPath $workspaceRoot -Directory -Force | Sort-Object Name)) {
         if ($registeredNames.ContainsKey($candidate.Name) -or $candidate.Name -eq $contextRepoName) { continue }
         if (-not (Test-Path -LiteralPath (Join-Path $candidate.FullName '.git'))) { continue }
+        if (Test-RepositoryRemoteMatch -RepositoryRoot $candidate.FullName -ExpectedRemote $contextRemote) { continue }
         $looksManaged = (Test-Path -LiteralPath (Join-Path $candidate.FullName 'AI_CONTEXT.md') -PathType Leaf) -or (Test-Path -LiteralPath (Join-Path $candidate.FullName '.ai/context')) -or $candidate.Name.StartsWith(([string]$registry.project + '-'))
         if (-not $looksManaged) { continue }
         $candidates += [pscustomobject]@{ repository = $candidate.Name; localPath = $candidate.FullName; reason = 'Sibling Git repository resembles a project member but is not registered.' }

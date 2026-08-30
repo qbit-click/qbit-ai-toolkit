@@ -835,7 +835,7 @@ EOF
 }
 
 test_membership_audit_reports_candidate_without_mutation() {
-  local root member candidate before after out
+  local root member candidate context_alias before after out
   root=$(mktemp -d)
   member=$(make_fixture "$root")
   candidate="$root/test-project-docs"
@@ -844,10 +844,13 @@ test_membership_audit_reports_candidate_without_mutation() {
   printf '# Candidate\n' >"$candidate/AI_CONTEXT.md"
   git -C "$candidate" add AI_CONTEXT.md
   git -C "$candidate" commit -m candidate >/dev/null
+  context_alias="$root/local-context-alias"
+  git clone --branch main --single-branch "$root/context.git" "$context_alias" >/dev/null 2>&1
   before=$(git --git-dir "$root/context.git" rev-parse refs/heads/main)
   out=$(bash "$member/.ai/context/context.sh" audit)
   after=$(git --git-dir "$root/context.git" rev-parse refs/heads/main)
   [[ "$out" == *'"repository": "test-project-docs"'* ]]
+  [[ "$out" != *'local-context-alias'* ]]
   [[ "$out" == *'"candidates":'* ]]
   [[ "$before" == "$after" ]]
 }

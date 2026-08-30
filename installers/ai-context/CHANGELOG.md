@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.5
+
+- Exclude sibling clones of the configured central context remote from read-only fleet audit candidates even when their local directory name differs from the remote repository name.
+- Canonicalize common HTTPS/SSH/SCP-style Git remote identities without network access so central-repository exclusion remains deterministic and read-only.
+- Add Windows and POSIX regression coverage proving a differently named local clone of the central context remote is not reported as an unregistered member candidate.
+
 ## 1.2.4
 
 - Restore backward compatibility with project-owned repository registry metadata used by existing Continuity fleets, including top-level blocks such as `excluded_directories` and repository metadata such as `authority`, `publish`, and `notes`.

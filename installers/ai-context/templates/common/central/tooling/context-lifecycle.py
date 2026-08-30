@@ -379,6 +379,36 @@ def remote_repository_name(remote: str) -> str | None:
     return name[:-4] if name.endswith(".git") else name
 
 
+def normalize_remote_identity(remote: str) -> str:
+    value = remote.strip().replace("\\", "/").rstrip("/")
+    if value.endswith(".git"):
+        value = value[:-4]
+    scp_match = re.match(r"^[^@/\s]+@([^:]+):(.+)$", value)
+    if scp_match:
+        return f"{scp_match.group(1).lower()}/{scp_match.group(2).lstrip('/')}"
+    url_match = re.match(r"^[A-Za-z][A-Za-z0-9+.-]*://(?:[^@/]+@)?([^/]+)/(.+)$", value)
+    if url_match:
+        return f"{url_match.group(1).lower()}/{url_match.group(2).lstrip('/')}"
+    return value
+
+
+def repository_has_remote_identity(repository_root: Path, expected_remote: str) -> bool:
+    expected = normalize_remote_identity(expected_remote)
+    if not expected:
+        return False
+    remotes = run_git(repository_root, ["remote"], True)
+    if remotes.returncode != 0:
+        return False
+    for remote_name in (line.strip() for line in remotes.stdout.splitlines() if line.strip()):
+        urls = run_git(repository_root, ["remote", "get-url", "--all", remote_name], True)
+        if urls.returncode != 0:
+            continue
+        for url in (line.strip() for line in urls.stdout.splitlines() if line.strip()):
+            if normalize_remote_identity(url) == expected:
+                return True
+    return False
+
+
 def resolve_registered_local_path(member_root: Path, context_root: Path, configured_path: str | None, repo_id: str) -> Path:
     if configured_path:
         candidate = Path(configured_path)
@@ -436,13 +466,16 @@ def audit_membership(member_root: Path, context_root: Path, config: dict[str, An
                         result["status"] = "mismatched-context-config"
         registered_results.append(result)
 
-    context_repo_name = remote_repository_name(str((config.get("context") or {}).get("remote") or ""))
+    context_remote = str((config.get("context") or {}).get("remote") or "")
+    context_repo_name = remote_repository_name(context_remote)
     candidates: list[dict[str, Any]] = []
     workspace_root = member_root.parent.resolve()
     for candidate in sorted((path for path in workspace_root.iterdir() if path.is_dir()), key=lambda path: path.name.lower()):
         if candidate.name in registered_names or candidate.name == context_repo_name:
             continue
         if not (candidate / ".git").exists():
+            continue
+        if repository_has_remote_identity(candidate, context_remote):
             continue
         looks_managed = (
             (candidate / "AI_CONTEXT.md").is_file()
