@@ -14,7 +14,7 @@ New substantive checkpoints use Continuity v2 (`schemaVersion: 2`). Active work 
 
 The canonical Continuity v2 contract is documented in [`docs/ai-tooling/continuity-v2.md`](docs/ai-tooling/continuity-v2.md).
 
-The canonical context source is the private Git repository `https://github.com/qbit-click/qbit-ai-context.git`. The lifecycle automatically clones or refreshes it into the ignored project-local context cache; no sibling checkout is required.
+The canonical context source is the private Git repository `https://github.com/qbit-hub/qbit-ai-context.git`. The lifecycle automatically clones or refreshes it into the ignored project-local context cache; no sibling checkout is required.
 
 ## Authority and safety
 

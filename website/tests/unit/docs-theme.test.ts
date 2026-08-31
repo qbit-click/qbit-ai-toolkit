@@ -12,7 +12,7 @@ describe('documentation platform contract', () => {
     expect(template.template).toBe('qbit-documentation');
     expect(template.templateVersion).toBe('1.0.1');
     expect(template.source).toEqual({
-      repository: 'https://github.com/qbit-click/qbit-ai-toolkit.git',
+      repository: 'https://github.com/qbit-hub/qbit-ai-toolkit.git',
       path: 'website',
     });
     expect(template.sharedFiles).toContain('src/css/custom.css');

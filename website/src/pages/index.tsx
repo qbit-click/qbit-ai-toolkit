@@ -210,7 +210,7 @@ export default function Home(): ReactNode {
                   </Link>
                   <Link
                     className="button button--secondary button--lg"
-                    href="https://github.com/qbit-click/qbit-ai-toolkit">
+                    href="https://github.com/qbit-hub/qbit-ai-toolkit">
                     {text.githubCta}
                   </Link>
                 </div>

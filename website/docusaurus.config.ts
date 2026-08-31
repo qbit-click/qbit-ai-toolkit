@@ -13,7 +13,7 @@ const config: Config = {
 
   url: 'https://ai-toolkit.qbit.click',
   baseUrl: '/',
-  organizationName: 'qbit-click',
+  organizationName: 'qbit-hub',
   projectName: 'qbit-ai-toolkit',
   trailingSlash: false,
   onBrokenLinks: 'throw',
@@ -44,7 +44,7 @@ const config: Config = {
           path: '../docs',
           routeBasePath: '/',
           sidebarPath: './sidebars.ts',
-          editUrl: 'https://github.com/qbit-click/qbit-ai-toolkit/edit/main/docs/',
+          editUrl: 'https://github.com/qbit-hub/qbit-ai-toolkit/edit/main/docs/',
         },
         blog: false,
         theme: {
@@ -89,7 +89,7 @@ const config: Config = {
         {type: 'docSidebar', sidebarId: 'engineering', label: 'Engineering', position: 'left'},
         {type: 'localeDropdown', position: 'right'},
         {
-          href: 'https://github.com/qbit-click/qbit-ai-toolkit',
+          href: 'https://github.com/qbit-hub/qbit-ai-toolkit',
           label: 'GitHub',
           position: 'right',
         },
@@ -120,7 +120,7 @@ const config: Config = {
         {
           title: 'Project',
           items: [
-            {label: 'GitHub', href: 'https://github.com/qbit-click/qbit-ai-toolkit'},
+            {label: 'GitHub', href: 'https://github.com/qbit-hub/qbit-ai-toolkit'},
             {label: 'Qbit', href: 'https://qbit.click'},
           ],
         },

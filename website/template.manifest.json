@@ -3,7 +3,7 @@
   "template": "qbit-documentation",
   "templateVersion": "1.0.1",
   "source": {
-    "repository": "https://github.com/qbit-click/qbit-ai-toolkit.git",
+    "repository": "https://github.com/qbit-hub/qbit-ai-toolkit.git",
     "path": "website"
   },
   "toolchain": {

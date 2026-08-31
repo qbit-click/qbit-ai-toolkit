@@ -49,7 +49,7 @@
   },
   "link.item.label.GitHub": {
     "message": "GitHub",
-    "description": "The label of footer link with label=GitHub linking to https://github.com/qbit-click/qbit-ai-toolkit"
+    "description": "The label of footer link with label=GitHub linking to https://github.com/qbit-hub/qbit-ai-toolkit"
   },
   "link.item.label.Qbit": {
     "message": "Qbit",
