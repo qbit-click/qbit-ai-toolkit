@@ -129,3 +129,17 @@ The threshold should come from product risk and business requirements, not from 
 ## Prompt management
 
 If your provider offers prompt IDs, version history, variables, rollback, or linked evals, use them where they fit your deployment model. In this repository, reusable prompts should still be versioned alongside their tests and consumer contract so that behavior changes are reviewable in Git.
+
+## Automatic prompt optimization
+
+Automatic optimization is candidate search, not an automatic release decision. Use a controlled workflow:
+
+1. freeze acceptance criteria and a versioned dataset;
+2. generate candidate prompt variants;
+3. evaluate every candidate on the same training/tuning subset using task-appropriate deterministic checks and rubrics;
+4. select candidates, then validate them on held-out and permanent regression cases;
+5. inspect latency and cost, obtain human review where semantics or risk require it, and version the winner with its evidence.
+
+Do not optimize directly on the final test set: repeated selection against it overfits the prompt and invalidates its independence. BLEU or ROUGE can be useful for narrowly defined text-overlap tasks, but they are not generic measures of prompt quality.
+
+Provider-managed tools such as **Vertex AI Prompt Optimizer** can generate and evaluate variants against configured metrics. They are optional provider tooling; the application still owns its eval contract, held-out validation, and release gate.

@@ -24,6 +24,10 @@ Return the label only.
 
 A zero-shot baseline is useful because it tells you whether examples are actually needed.
 
+## One-shot prompting
+
+One-shot prompting is the single-example case between zero-shot and broader few-shot use. Use one precise example when it is enough to demonstrate the required format or convention. One example gives poor edge-case coverage, so evaluate it rather than assuming it generalizes.
+
 ## Few-shot examples
 
 Use a small set of examples when the output boundary, labeling convention, edge cases, tone, or transformation is difficult to describe compactly.
@@ -51,6 +55,19 @@ Role framing can help set vocabulary, audience, tone, or review criteria:
 > Review this design from the perspective of a senior security engineer. Focus on trust boundaries, least privilege, secret handling, and rollback risk.
 
 Do not treat fictional credentials as evidence of correctness. Saying "you are a doctor with 20 years of experience" does not give a model medical experience. Prefer explicit expertise criteria and required checks over invented biography.
+
+## Step-back prompting
+
+Step-back prompting asks for the governing principles, criteria, invariants, or domain abstractions before applying them to a concrete case. It is useful when a design or review decision improves by recalling its governing rules, or when an unfamiliar instance needs better framing first.
+
+For example:
+
+```text
+Before reviewing this payment-retry design, list the invariants for preventing duplicate charges.
+Then assess the supplied design against those invariants and identify any gap.
+```
+
+This can be one structured prompt, or separate retrieval/analysis stages when isolation or independent validation matters. It is not a request for hidden Chain-of-Thought: ask for concise, reviewable principles and evidence instead. Treat it as a heuristic to evaluate on representative cases, not a guarantee of greater accuracy or lower bias.
 
 ## Decompose complex work
 

@@ -86,6 +86,14 @@ Rules:
 
 This improves clarity but does not make the system immune to prompt injection. Security controls must also exist outside the prompt.
 
+## Reusable templates and variables
+
+Variables make a stable prompt template reusable, but each variable needs a contract. Define its expected type/format and its missing-value behavior; for example, `customer_message` is required untrusted text, while `account_tier` is an optional enum that becomes `unknown` when absent.
+
+Keep trusted template instructions separate from substituted data. Quote, delimit, or otherwise structure inserted data where useful, and never let an ordinary data variable silently become a higher-priority instruction channel. Delimiters improve clarity; they do not make prompt injection impossible.
+
+Version the template and its variable contract together. Provider prompt resources, variables, and version history can help when available, but this repository's Git-owned prompt, test, and consumer contracts must remain reviewable.
+
 ## Prefer positive, concrete instructions
 
 Long prohibition lists are often harder to maintain than a clear statement of the desired behavior.

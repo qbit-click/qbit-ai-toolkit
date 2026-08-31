@@ -85,10 +85,25 @@ test('representative documentation route remains reachable', async ({page}) => {
   await expect(page.getByRole('heading', {name: 'AI Tools', level: 1})).toBeVisible();
 });
 
+test('new prompt-engineering routes are bilingual and preserve RTL', async ({page}) => {
+  await page.goto('/prompt-engineering/multimodal-prompting');
+  await expect(page.getByRole('heading', {name: 'Multimodal prompting', level: 1})).toBeVisible();
+
+  await page.goto('/fa/prompt-engineering/code-prompting');
+  await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
+  await expect(page.getByRole('heading', {name: 'پرامپت‌نویسی برای کد', level: 1})).toBeVisible();
+});
+
 test('local search returns English and Persian documentation', async ({page}) => {
   await page.goto('/search?q=Prompt%20Engineering');
   await expect(page.getByRole('link', {name: /Prompt Engineering/i}).first()).toBeVisible();
 
   await page.goto('/fa/search?q=مهندسی%20پرامپت');
   await expect(page.getByRole('link', {name: /مهندسی پرامپت/}).first()).toBeVisible();
+
+  await page.goto('/search?q=Multimodal%20prompting');
+  await expect(page.getByRole('link', {name: /Multimodal prompting/i}).first()).toBeVisible();
+
+  await page.goto('/fa/search?q=Image');
+  await expect(page.locator('a[href*="/fa/prompt-engineering/multimodal-prompting"]').first()).toBeVisible();
 });

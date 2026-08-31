@@ -27,6 +27,13 @@ describe('Qbit AI Toolkit documentation build', () => {
     expect(read('ai-tools.html')).toContain('AI Tools');
   });
 
+  it('renders synchronized multimodal and code-prompting routes', () => {
+    expect(read('prompt-engineering/multimodal-prompting.html')).toContain('Multimodal prompting');
+    expect(read('prompt-engineering/code-prompting.html')).toContain('Code prompting');
+    expect(read('fa/prompt-engineering/multimodal-prompting.html')).toContain('پرامپت‌نویسی چندوجهی');
+    expect(read('fa/prompt-engineering/code-prompting.html')).toContain('پرامپت‌نویسی برای کد');
+  });
+
   it('ships local search indexes for both locales', () => {
     expect(findSearchIndex()).toContain('Prompt Engineering');
     expect(findSearchIndex('fa')).toContain('مهندسی پرامپت');

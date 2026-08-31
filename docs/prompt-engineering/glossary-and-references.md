@@ -15,7 +15,9 @@ sidebar_label: Glossary & references
 | Token | A model's text-processing unit; token boundaries do not map one-to-one to words. |
 | Context Window | The maximum context a model can process in one interaction/state window, subject to model and API behavior. |
 | Zero-shot | Asking for a task without in-prompt examples. |
+| One-shot | Supplying one precise example to demonstrate a required format or convention; it has limited edge-case coverage. |
 | Few-shot | Supplying a small number of examples to demonstrate a task or output convention. |
+| Step-back Prompting | Eliciting or retrieving higher-level principles or criteria before applying them to a concrete task. |
 | Chain-of-Thought (CoT) | Intermediate reasoning traces. Historically, prompting models to emit such traces improved some reasoning tasks; modern reasoning models often reason internally, so production prompts should prefer verifiable summaries/evidence over demanding private reasoning. |
 | Reasoning Model | A model family trained/configured to spend additional inference work on complex tasks, often with model-specific reasoning controls. |
 | Self-consistency | Sampling multiple candidate reasoning/answer paths and aggregating them. |
@@ -29,6 +31,9 @@ sidebar_label: Glossary & references
 | System/Developer Instruction | Higher-priority application instructions in APIs that support message-role hierarchies. Not a secure secret store. |
 | Hallucination | Model output that is unsupported, fabricated, or incorrect while being presented plausibly. |
 | Eval | A repeatable test used to measure model/prompt behavior against defined criteria. |
+| Prompt Optimization | Generating and selecting prompt candidates against a defined evaluation contract; it still requires held-out validation. |
+| Multimodal Prompting | Designing a prompt and evidence contract across text, images, video, audio, or documents. |
+| Prompt Template/Variable | A versioned reusable instruction template and its typed, missing-value-aware substitution contract. |
 | Fine-tuning | Updating a model's learned behavior using training data; distinct from supplying examples in a single prompt. |
 | AI Agent | A system in which a model can make decisions across multiple steps and use tools or external systems under an orchestration and permission model. |
 
@@ -42,6 +47,11 @@ The supplied v4 booklet is a strong introductory base, but this documentation ma
 - replaces fictional-expertise role prompts with explicit review criteria and perspective framing;
 - updates OpenAI examples around the Responses API, Structured Outputs, `reasoning.effort`, and `max_output_tokens`;
 - avoids universal temperature ranges and other model-agnostic parameter recipes;
+- makes clear that strict JSON/schema controls constrain output shape, not factual truth;
+- does not prescribe a universal few-shot example count;
+- treats BLEU/ROUGE as narrow text-overlap metrics, not default generic prompt-quality measures;
+- rejects fixed sampling or CoT temperature recipes as universal guidance;
+- adds capability, security, validation, and operational context for multimodal and code prompting;
 - distinguishes ChatGPT product memory from API conversation state;
 - states explicitly that the system prompt is not a secret or authorization boundary;
 - strengthens RAG guidance around access control, citation validation, and indirect prompt injection;
@@ -70,10 +80,13 @@ For implementation guidance, prefer current official documentation over static t
 - OpenAI API Reference — Responses API message roles, reasoning controls, tools, and Structured Outputs.
 - OpenAI API documentation — model-version compatibility and eval guidance.
 - OpenAI Help Center — current ChatGPT Memory documentation.
+- Google Cloud — *Overview of prompting strategies* and the Gemini/Vertex AI Prompting Guide.
+- Google Cloud — *Vertex AI Prompt Optimizer* documentation.
+- Google Cloud — multimodal prompting guidance for images, video, audio, and documents.
 - OWASP GenAI Security Project — `LLM01:2025 Prompt Injection`.
 - OWASP GenAI Security Project — `LLM07:2025 System Prompt Leakage`.
 - OWASP GenAI Security Project — current RAG/vector/embedding risk guidance.
 
 ## Review date
 
-This documentation was technically reviewed against current public references on **2026-08-10**. Provider behavior changes quickly; re-check model-specific API documentation before copying parameter names, supported values, or lifecycle dates into production code.
+This documentation was technically reviewed against current public references on **2026-08-31**. Provider behavior changes quickly; re-check model-specific API documentation before copying parameter names, supported values, or lifecycle dates into production code.

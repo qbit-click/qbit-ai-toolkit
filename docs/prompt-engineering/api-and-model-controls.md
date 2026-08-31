@@ -10,7 +10,7 @@ Prompt text is only one part of model behavior. In API applications, model selec
 
 ## OpenAI API direction
 
-For new OpenAI integrations, prefer the **Responses API** and the current model-specific documentation. The older Assistants API is deprecated and is scheduled to shut down on **2026-08-26**; do not start new production work on it.
+For new OpenAI integrations, prefer the **Responses API** and the current model-specific documentation. The older Assistants API had a published **2026-08-26** shutdown date, which is now past; do not start new production work on it. Check the current provider migration and availability documentation before making implementation assumptions.
 
 Chat Completions still exists for compatible use cases, but examples in this guide use Responses-era concepts where possible.
 
@@ -67,6 +67,10 @@ Some current models expose a `verbosity` control for response length/detail. Pre
 Do not teach fixed ranges such as "0-0.3 for code" as universal rules. Model families differ, some reasoning configurations restrict or ignore sampling controls, and lower randomness does not guarantee correctness.
 
 When both controls are available, change one at a time unless you have eval evidence that tuning both is beneficial.
+
+## Top-k
+
+Some providers also expose `top_k`, which conceptually limits selection to a ranked set of candidate tokens. Its exact interaction and application order with `top_p` and temperature are provider- and model-specific, so consult the selected model's reference instead of treating old extreme-value recipes as universal API semantics.
 
 ## Output token limits
 

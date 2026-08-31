@@ -21,6 +21,7 @@ const sidebars: SidebarsConfig = {
       items: [
         'prompt-engineering/patterns',
         'prompt-engineering/reasoning-and-agents',
+        'prompt-engineering/code-prompting',
       ],
     },
     {
@@ -40,6 +41,7 @@ const sidebars: SidebarsConfig = {
         'prompt-engineering/api-and-model-controls',
         'prompt-engineering/context-and-grounding',
         'prompt-engineering/security',
+        'prompt-engineering/multimodal-prompting',
       ],
     },
     {
