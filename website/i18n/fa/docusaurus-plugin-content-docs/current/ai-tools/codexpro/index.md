@@ -32,3 +32,14 @@ MCP token و connector URL حاوی token را secret در نظر بگیرید. 
 ## customizationهای version-specific
 
 اگر deployment فایل‌های source CodexPro را patch می‌کند یا tool سفارشی اضافه می‌کند، build دقیق CodexPro را pin و آن تغییر را به‌عنوان patch asset versioned مدیریت کنید. Hash، package path، username، hostname یا connector name یک ماشین دیگر را به‌عنوان مقدار universal در مستندات عمومی منتشر نکنید.
+
+## Windows patch installer و launcher
+
+Customization فعلی Qbit روی Windows از دو component محلی جدا تشکیل شده است:
+
+- `Install-CodexProWorkspaceSandbox.ps1` package پشتیبانی‌شده CodexPro را برای Windows workspace sandbox/environment patch می‌کند؛
+- `Start-CodexPro.ps1` مالک deployment valueهای runtime مثل workspace، public hostname، tunnel name، host-execution mode و Cloudflare transport است.
+
+Patch installer، launcher را **تولید نمی‌کند** و public hostname را دریافت نمی‌کند. Hostname توسط مالک deployment انتخاب می‌شود، به Cloudflare named tunnel route می‌شود و از طریق launcher/configuration وارد runtime می‌شود. Windows reference launcher اکنون `http2` را به‌عنوان default transport استفاده می‌کند و `auto` و `quic` را به‌عنوان alternative صریح نگه می‌دارد.
+
+این repository اکنون asset ویندوزی `installer.codexpro` را زیر `installers/codexpro/` منتشر می‌کند. این installer deployment پین‌شده CodexPro `0.29.0` را end-to-end آماده می‌کند و low-level package patch را به‌عنوان جزئیات version-specific داخلی نگه می‌دارد.

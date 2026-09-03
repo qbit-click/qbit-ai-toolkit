@@ -32,3 +32,14 @@ Treat MCP tokens and token-bearing connector URLs as secrets. Use the narrowest 
 ## Version-specific customizations
 
 If a deployment modifies CodexPro source files or adds custom tools, pin the exact CodexPro build and manage those changes as a versioned patch asset. Do not publish hashes, package paths, usernames, hostnames, or connector names copied from another machine as if they were universal reference values.
+
+## Windows patch installer and launcher
+
+The current Qbit Windows customization uses two separate local components:
+
+- `Install-CodexProWorkspaceSandbox.ps1` patches the supported CodexPro package for Windows workspace sandbox/environment behavior;
+- `Start-CodexPro.ps1` owns runtime deployment values such as workspace, public hostname, tunnel name, host-execution mode, and Cloudflare transport.
+
+The patch installer does **not** generate the launcher and does not receive the public hostname. The hostname is chosen by the deployment owner, routed to a Cloudflare named tunnel, and supplied through launcher/configuration values. The Windows reference launcher defaults the Cloudflare transport to `http2` while retaining `auto` and `quic` as explicit alternatives.
+
+This repository now publishes the Windows-only `installer.codexpro` asset under `installers/codexpro/`. It provisions the pinned CodexPro `0.29.0` deployment end to end while keeping the low-level package patch as an internal version-specific implementation detail.

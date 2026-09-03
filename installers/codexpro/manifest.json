@@ -1,0 +1,31 @@
+{
+  "$schema": "../../schemas/installer-manifest.schema.json",
+  "id": "installer.codexpro",
+  "name": "CodexPro Windows Deployment",
+  "version": "1.0.0",
+  "kind": "installer",
+  "status": "stable",
+  "consumers": [
+    "shared"
+  ],
+  "supportedPlatforms": [
+    "windows"
+  ],
+  "supportedProfiles": [
+    "generic"
+  ],
+  "defaultProfile": "generic",
+  "entrypoints": {
+    "powershell": "install.ps1",
+    "posix": "install.sh"
+  },
+  "verifiers": {
+    "powershell": "verify.ps1",
+    "posix": "verify.sh"
+  },
+  "uninstallers": {
+    "powershell": "uninstall.ps1",
+    "posix": "uninstall.sh"
+  },
+  "description": "Installs a complete pinned CodexPro 0.29.0 Windows deployment: prerequisites, workspace sandbox and host-execution extension, MCP token, launcher, PowerShell helper, and Cloudflare named-tunnel configuration."
+}

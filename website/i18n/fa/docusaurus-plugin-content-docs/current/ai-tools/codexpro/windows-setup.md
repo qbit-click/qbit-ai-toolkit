@@ -71,10 +71,28 @@ cloudflared --version
 | Local MCP | `http://127.0.0.1:8787/mcp` |
 | Public hostname | `<PUBLIC_HOSTNAME>` |
 | Tunnel name | `<TUNNEL_NAME>` |
+| Tunnel transport | پیش‌فرض `http2`؛ در صورت انتخاب صریح `auto` یا `quic` |
 | ChatGPT connector name | `<CONNECTOR_NAME>` |
 | Host execution mode | `off`، `on-request` یا `full-access` |
 
 Launcher قابل استفاده مجدد باید این موارد را از parameter/configuration بگیرد و هیچ username، machine name، project name، DNS واقعی، tunnel ID یا global package path شخصی را داخل source نگذارد.
+
+## روش پیشنهادی: Installer کامل Qbit
+
+برای deployment ویندوزی patch‌شده Qbit، به‌جای ساخت دستی patch، token، launcher، profile helper و tunnel از installer versioned زیر `installers/codexpro/` استفاده کنید:
+
+```powershell
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\installers\codexpro\install.ps1 `
+  -WorkspaceRoot '<WORKSPACE_PATH>' `
+  -Hostname '<PUBLIC_HOSTNAME>' `
+  -TunnelName '<TUNNEL_NAME>'
+```
+
+Installer dependencyهای host را validate یا install می‌کند، `codexpro@0.29.0` را pin می‌کند، authentication مربوط به Codex CLI را verify می‌کند، extension مربوط به Windows workspace sandbox و host execution را اعمال می‌کند، MCP token را ایجاد/حفظ می‌کند، `deployment.json` را می‌نویسد، `Start-CodexPro.ps1` و helper مدیریت‌شده `cpx` را نصب می‌کند، named Cloudflare tunnel را create/reuse می‌کند، hostname ورودی را route می‌کند و قبل از اعلام موفقیت `verify.ps1` را اجرا می‌کند.
+
+Hostname باید توسط caller داده شود، چون مالکیت domain یک واقعیت بیرونی deployment است. اگر credential مربوط به Cloudflare موجود نباشد، installer flow تعاملی استاندارد `cloudflared tunnel login` را شروع می‌کند. فقط وقتی tunnel/DNS عمداً در جای دیگری مدیریت می‌شود از `-SkipTunnelSetup` استفاده کنید.
+
+Overrideهای مهم شامل `-HostExecMode off|on-request|full-access`، `-TunnelProtocol auto|quic|http2` با default برابر `http2` و `-PackageManager auto|bun|npm|pnpm` هستند. بخش‌های بعدی componentهایی را که installer کامل مالک آن‌ها است برای troubleshooting و deployment سفارشی توضیح می‌دهند.
 
 ## مرز امنیتی
 
@@ -102,6 +120,8 @@ ChatGPT -> CodexPro host execution -> direct Windows process
 - environment variableهای secret-like filter شوند؛
 - default پیشنهادی `on-request` است مگر unattended direct execution یک requirement صریح باشد؛
 - `full-access` محدودیت UAC یا Administrator را دور نمی‌زند.
+
+Permissionهای connector در ChatGPT یک gate جدا از `hostExecMode` محلی CodexPro هستند. اگر workflow عمداً از `host_exec` یا `open_app` استفاده می‌کند، connector باید اجازه آن actionها را داشته باشد؛ policy پیش‌فرض/low-risk ممکن است workspace toolها را فعال نگه دارد ولی host actionهای پرریسک‌تر را در دسترس قرار ندهد.
 
 MCP URL حاوی token، مخصوصاً در حالت direct host execution، secret محسوب می‌شود.
 
@@ -238,6 +258,8 @@ cloudflared tunnel list
 
 Tunnel ID را Cloudflare تولید می‌کند. ID متعلق به deployment دیگر را داخل launcher عمومی hardcode نکنید.
 
+Public hostname یک deployment input است و Windows patch installer آن را discover یا generate نمی‌کند. مالک deployment یک DNS hostname تحت کنترل خودش انتخاب می‌کند و آن را با `cloudflared tunnel route dns` به named tunnel متصل می‌کند. `<PUBLIC_HOSTNAME>` و `<TUNNEL_NAME>` باید input صریح launcher/configuration بمانند.
+
 ## تنظیم Git Bash
 
 به‌جای مسیر user-specific، discovery انجام دهید:
@@ -276,6 +298,20 @@ if (-not $GitBash) {
 
 اگر stock CodexPro capability لازم را ارائه می‌کند، stock implementation را به local patch ترجیح دهید.
 
+### مرز فعلی Qbit Windows patch installer
+
+اسکریپت مرجع Qbit با نام `Install-CodexProWorkspaceSandbox.ps1` یک **package patch installer** است، نه installer کامل deployment برای CodexPro. مسئولیت فعلی آن فقط patch version-specific مربوط به Windows Bash sandbox/environment است:
+
+- CodexPro package directory را دریافت می‌کند؛
+- فایل‌های پشتیبانی‌شده `dist` را patch و backupهای rollback را ایجاد می‌کند؛
+- `Start-CodexPro.ps1` را **ایجاد نمی‌کند**؛
+- MCP token را **ایجاد نمی‌کند**؛
+- public hostname یا Cloudflare tunnel name را درخواست، discover یا ذخیره **نمی‌کند**.
+
+در نتیجه launcher و tunnel configuration دو deployment asset جدا هستند. در طراحی فعلی `<PUBLIC_HOSTNAME>` و `<TUNNEL_NAME>` به launcher/configuration داده می‌شوند و patch installer مستقل از DNS و tunnel ownership باقی می‌ماند.
+
+`qbit-ai-toolkit` اکنون این flow را به‌عنوان asset رسمی و Windows-only با نام `installer.codexpro` زیر `installers/codexpro/` منتشر می‌کند. Installer کامل، dependency validation/installation، patch پین‌شده CodexPro `0.29.0`، MCP token، launcher، helper `cpx` و named-tunnel/DNS setup را مدیریت می‌کند. `installer.codex-ai-tooling` همچنان installer جداگانه repository AI-development tooling است.
+
 ## Launcher قابل استفاده مجدد
 
 Launcher باید مقادیر deployment را parameter بگیرد. مثال زیر هیچ path یا hostname شخصی ندارد:
@@ -293,7 +329,10 @@ param(
     [string]$TunnelName,
 
     [ValidateSet('off', 'on-request', 'full-access')]
-    [string]$HostExecMode = 'on-request'
+    [string]$HostExecMode = 'on-request',
+
+    [ValidateSet('auto', 'quic', 'http2')]
+    [string]$TunnelProtocol = 'http2'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -327,10 +366,12 @@ if ([string]::IsNullOrWhiteSpace($McpToken) -or $McpToken -match '\s') {
 $PreviousBashSandbox = $env:CODEXPRO_BASH_SANDBOX
 $PreviousBashExecutable = $env:CODEXPRO_BASH_EXECUTABLE
 $PreviousHostExecMode = $env:CODEXPRO_HOST_EXEC_MODE
+$PreviousTunnelTransportProtocol = $env:TUNNEL_TRANSPORT_PROTOCOL
 
 $env:CODEXPRO_BASH_SANDBOX = 'workspace'
 $env:CODEXPRO_BASH_EXECUTABLE = $GitBash
 $env:CODEXPRO_HOST_EXEC_MODE = $HostExecMode
+$env:TUNNEL_TRANSPORT_PROTOCOL = $TunnelProtocol
 
 $CodexProArgs = @(
     'stable',
@@ -351,6 +392,7 @@ finally {
     $env:CODEXPRO_BASH_SANDBOX = $PreviousBashSandbox
     $env:CODEXPRO_BASH_EXECUTABLE = $PreviousBashExecutable
     $env:CODEXPRO_HOST_EXEC_MODE = $PreviousHostExecMode
+    $env:TUNNEL_TRANSPORT_PROTOCOL = $PreviousTunnelTransportProtocol
 }
 ```
 
@@ -360,7 +402,7 @@ finally {
 ~\.codexpro\Start-CodexPro.ps1
 ```
 
-چون workspace، hostname، tunnel name و host mode در runtime داده می‌شوند، launcher به یک machine خاص وابسته نمی‌شود.
+چون workspace، hostname، tunnel name، host mode و tunnel transport به‌صورت deployment value داده می‌شوند، launcher به یک machine خاص وابسته نمی‌شود. برای مسیر long-lived مربوط به MCP/SSE، پیش‌فرض مرجع `http2` است؛ `auto` و `quic` همچنان برای محیط‌هایی که عمداً آن‌ها را ترجیح می‌دهند در دسترس هستند.
 
 ## Helper اختیاری `cpx`
 
@@ -429,7 +471,8 @@ http://127.0.0.1:8787/healthz
 - write mode؛
 - tool mode؛
 - environment inheritance؛
-- host-execution mode در صورت نصب extension.
+- host-execution mode در صورت نصب extension؛
+- tunnel transport مورد انتظار در صورت استفاده از public Cloudflare tunnel.
 
 Tool count ثابت متعلق به deployment دیگری را acceptance criterion قرار ندهید؛ inventory ممکن است با version و capability set تغییر کند.
 
@@ -451,9 +494,11 @@ C:\Windows\System32\whoami.exe
 
 Approval behavior باید مطابق mode انتخاب‌شده باشد.
 
+همچنین verify کنید permission policy connector در ChatGPT action مربوط به host را مجاز می‌کند. Workspace toolها و `open_workspace` همچنان تحت `allowedRoots` CodexPro هستند؛ موفقیت `host_exec` خارج از workspace یک capability جدا است و فقط باید عمداً با command harmless و read-only تست شود.
+
 ### 6. Public tunnel
 
-بررسی کنید hostname عمومی به endpoint محلی route شود و request بدون authentication نتواند MCP access بگیرد.
+بررسی کنید hostname عمومی به endpoint محلی route شود و request بدون authentication نتواند MCP access بگیرد. با default پیشنهادی launcher، startup مربوط به `cloudflared` باید `Initial protocol http2` و connectionهای ثبت‌شده با `protocol=http2` را نشان دهد.
 
 ### 7. End-to-end connector
 
@@ -503,6 +548,12 @@ Git Bash را مستقل verify کنید و سپس `CODEXPRO_BASH_EXECUTABLE` ر
 
 DNS، named tunnel، hostname ownership و authentication را جداگانه بررسی کنید. برای debug tunnel، MCP authentication را ضعیف نکنید.
 
+### Tunnel ناپایدار است یا همه edge connectionها هم‌زمان قطع می‌شوند
+
+قبل از مقصر دانستن Cloudflare transport، VPN، TUN، proxy و تغییرات default route را بررسی کنید. یک VPN/TUN interface می‌تواند ترافیک `cloudflared` را intercept کند و هم QUIC و هم HTTP/2 را ناپایدار کند. اگر با غیرفعال کردن VPN یا bypass کردن Cloudflare tunnel traffic مشکل رفع می‌شود، routing policy را اصلاح کنید و صرفاً protocol را مرتب عوض نکنید.
+
+برای Windows reference launcher، `http2` را به‌عنوان default نگه دارید مگر اینکه تست واقعی دلیل مشخصی برای `auto` یا `quic` نشان دهد.
+
 ### Host execution بیش از حد permissive است
 
 Mode را به `on-request` یا `off` تغییر دهید و server را restart کنید.
@@ -514,12 +565,15 @@ Mode را به `on-request` یا `off` تغییر دهید و server را restar
 - [ ] هیچ username، machine name، project name، hostname واقعی، tunnel ID یا package-manager-specific global path داخل reusable script وجود ندارد.
 - [ ] MCP listener روی loopback bind شده است.
 - [ ] Public tunnel hostname صحیح resolve می‌شود.
+- [ ] Tunnel transport موردنظر صریح است؛ default مرجع Windows برابر `http2` است.
 - [ ] MCP authentication فعال است و secret commit نشده است.
 - [ ] Workspace root صریح است.
 - [ ] `cwd=..` نمی‌تواند از workspace خارج شود.
 - [ ] Git Bash داخل workspace sandbox اجرا می‌شود.
 - [ ] broad host environment inheritance بدون review فعال نشده است.
 - [ ] Optional host execution approval mode صحیح دارد.
+- [ ] Permissionهای ChatGPT connector فقط زمانی host actionها را مجاز می‌کنند که این capability عمداً لازم باشد.
+- [ ] VPN/TUN routing باعث ناپایداری public tunnel نمی‌شود یا tunnel traffic به‌صورت صریح bypass شده است.
 - [ ] E2E روی disposable test repository پاس می‌شود.
 - [ ] Patchهای version-specific، در صورت وجود، برای exact build فعلی تولید و validate شده‌اند.
 
